@@ -55,7 +55,7 @@ class SignalGenerator:
             distractor = ''.join(random.choices("0123456789", k=max(1, len(answer))))
             while distractor == answer or distractor in distractors:
                 distractor = ''.join(random.choices("0123456789", k=max(1, len(answer))))
-            distractors.append(distr NPector)
+            distractors.append(distractor)
         
         strength = random.randint(1, 3)
         return ''.join(signal), self.rule_texts[rule], answer, distractors, strength
