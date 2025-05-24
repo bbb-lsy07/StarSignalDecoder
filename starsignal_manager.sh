@@ -42,7 +42,7 @@ translate() {
     key="$1"
     if [ "$LANG_MODE" = "zh" ]; then
         case "$key" in
-            "welcome") echo "星际迷航：信号解码管理器 v1.4.0";;
+            "welcome") echo "星际迷航：信号解码管理器 v1.5.0";;
             "status_installed") echo "状态：已安装（版本：%s，分支：%s）";;
             "status_not_installed") echo "状态：未安装";;
             "save_files_present") echo "存档文件：存在";;
