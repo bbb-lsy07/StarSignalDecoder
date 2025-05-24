@@ -17,9 +17,19 @@ def main():
         "--difficulty", choices=["easy", "medium", "hard"], default="easy",
         help="设置游戏难度：\n  easy（简单：60秒，3选项）\n  medium（中等：45秒，4选项）\n  hard（困难：30秒，5选项）（默认：easy）"
     )
+    parser.add_argument(
+        "--tutorial", action="store_true",
+        help="强制显示教程，适合新手"
+    )
+    parser.add_argument(
+        "--load", type=str,
+        help="加载存档文件（例如：save.json）"
+    )
     args = parser.parse_args()
 
-    game = StarSignalGame(difficulty=args.difficulty)
+    game = StarSignalGame(difficulty=args.difficulty, load_file=args.load)
+    if args.tutorial or game.is_first_time():
+        game.display.show_tutorial()
     game.start()
 
 if __name__ == "__main__":
