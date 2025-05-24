@@ -1,6 +1,7 @@
 import random
 import time
 import sys
+import os
 
 try:
     from colorama import Fore, Style, init
@@ -25,8 +26,7 @@ class Display:
         ║    星际迷航：信号解码              ║
         ╚══════════════════════════════════════╝
         欢迎，信号官！飞船被困危险星域！
-        挑战 3 关，解码信号，收集核心！
-        保持能量 ≥ 60% 以通关！
+        挑战 3 关，收集核心，最终能量 100% 逃离！
         按 'h' 提示，'s' 保存，'q' 退出。
         """
         self._animate_text(intro, Fore.CYAN)
@@ -36,7 +36,7 @@ class Display:
         ╔══════ 教程 ══════╗
         1. 信号示例：3#5*2，规则“忽略非数字字符”。
         2. 输入编号（如 1）选择答案。
-        3. 强度（弱/中/强）和天气影响难度。
+        3. 强度（弱/中/强）、天气、道具影响难度。
         4. 完成 NPC 任务获奖励。
         5. 按 'h' 提示，'s' 保存，'q' 退出。
         试试：信号 7*3#1，规则：忽略非数字字符
@@ -61,13 +61,14 @@ class Display:
         print(f"3) 选择关卡（已解锁：{', '.join(map(str, unlocked_levels))})")
         print(f"4) 无尽模式（{'已解锁' if endless_unlocked else '未解锁'}）")
 
-    def show_signal(self, signal, rule, options, energy, score, cores, stage, level, signal_strength, weather, equipment, task):
+    def show_signal(self, signal, rule, options, energy, score, cores, stage, level, signal_strength, weather, equipment, items, task):
         strength_text = ["弱", "中", "强"][signal_strength - 1]
         weather_text = {"clear": "晴朗", "storm": "风暴", "fog": "迷雾"}[weather]
         equip_text = equipment or "无"
+        items_text = ", ".join(items) or "无"
         task_text = task["description"] if task else "无"
-        warning = Fore.RED if energy < 30 else Fore.YELLOW if energy < 60 else Fore.WHITE
-        print(self.color_text(f"\n关卡 {level} | 天气：{weather_text} | 装备：{equip_text}", Fore.MAGENTA))
+        warning = Fore.RED if energy < 30 else Fore.YELLOW if energy < 80 else Fore.GREEN
+        print(self.color_text(f"\n关卡 {level} | 天气：{weather_text} | 装备：{equip_text} | 道具：{items_text}", Fore.MAGENTA))
         print(self.color_text(f"NPC任务：{task_text}", Fore.BLUE))
         print(self.color_text(f"信号（强度：{strength_text}）：", Fore.GREEN))
         self._animate_waveform(signal, strength_text)
@@ -100,10 +101,10 @@ class Display:
         """
         self._animate_text(boss, Fore.RED)
 
-    def show_store(self, score, available_gear):
+    def show_store(self, score, available_items):
         print(self.color_text(f"\n星际商店（得分：{score}）", Fore.CYAN))
-        for i, gear in enumerate(available_gear, 1):
-            print(f"{i}. {gear['name']}（{gear['cost']} 分）：{gear['description']}")
+        for i, item in enumerate(available_items, 1):
+            print(f"{i}. {item['name']}（{item['cost']} 分）：{item['description']}")
         print("0. 离开商店")
 
     def show_task_complete(self, reward):
@@ -120,9 +121,9 @@ class Display:
 
     def show_npc_dialogue(self, event_type=None, weather=None, task=None):
         weather_dialogues = {
+            "clear": "NPC: '晴朗天气，解码好时机！'",
             "storm": "NPC: '风暴干扰，抓紧解码！'",
-            "fog": "NPC: '迷雾增加干扰，小心选择！'",
-            "clear": "NPC: '晴朗天气，解码好时机！'"
+            "fog": "NPC: '迷雾增加干扰，小心选择！'"
         }
         event_dialogues = {
             "interference": "NPC: '信号干扰，时间减少！'",
@@ -149,14 +150,14 @@ class Display:
             print(self.color_text(random.choice(dialogues), Fore.BLUE))
 
     def show_hint(self, rule):
-        hint = f"提示：规则“{rule}”。分析信号，忽略干扰！输入编号（如 1），'s' 保存，'q' 退出。"
+        hint = f"提示：规则“{rule}”。分析信号，忽略干扰！输入编号（如 1），'s' 保存，'i' 使用道具，'q' 退出。"
         print(self.color_text(hint, Fore.YELLOW))
 
     def show_ending(self, score, cores, levels_cleared, energy):
-        if levels_cleared >= 3 and energy >= 80 and score > 100:
-            ending = "结局：星际传奇！你以高分通关，成为信号官神话！"
+        if levels_cleared >= 3 and energy == 100 and score > 100:
+            ending = "结局：星际传奇！你以完美能量和高分通关，成为信号官神话！"
             color = Fore.GREEN
-        elif levels_cleared >= 3 and energy >= 60:
+        elif levels_cleared >= 3 and energy >= 80:
             ending = "结局：险象环生！你通关，但飞船伤痕累累。"
             color = Fore.YELLOW
         else:
