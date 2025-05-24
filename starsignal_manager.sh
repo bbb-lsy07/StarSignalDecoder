@@ -149,7 +149,7 @@ translate() {
             "script_interrupted") translated_string="脚本被中断";;
             "starting_manager") translated_string="启动星际迷航：信号解码管理器";;
             "confirm_install_starsignal") translated_string="安装 starsignal";;
-            "confirm politics_starsignal") translated_string="更新 starsignal";;
+            "confirm_update_starsignal") translated_string="更新 starsignal";;
             "confirm_repair_starsignal") translated_string="修复 starsignal";;
             "confirm_uninstall_starsignal") translated_string="卸载 starsignal";;
             "starsignal_installing_branch") printf -v translated_string "正在安装 starsignal，分支：%s" "$@";;
@@ -194,7 +194,22 @@ translate() {
             "error_pip_required") translated_string="需要 pip3";;
             "error_git_required") translated_string="需要 git";;
             "error_path_required") translated_string="PATH 必须包含 Python Scripts 或 ~/.local/bin";;
-            *) translated_string="$key";; # 回退未翻译的键
+            "error_writing_log") printf -v translated_string "无法写入日志文件 %s" "$@";;
+            "error_apt_update") translated_string="apt update 失败";;
+            "error_install_failed") translated_string="安装失败";;
+            "error_homebrew_install") translated_string="Homebrew 安装失败";;
+            "error_unsupported_os_manual_install") translated_string="不支持的操作系统，请手动安装 Python 3.9+";;
+            "error_download_get_pip") translated_string="无法下载 get-pip.py";;
+            "error_update_path") translated_string="无法更新 PATH";;
+            "error_pip_not_found_check_branch") translated_string="pip 未找到，无法检查 starsignal 分支信息";;
+            "error_cannot_clean_saves") translated_string="无法清理存档";;
+            "current_status") translated_string="当前状态";;
+            "found_starsignal_not_in_path_hint") printf -v translated_string "在 %s 中找到 starsignal，但不在 PATH 中" "$@";;
+            "starsignal_branch_info_unavailable") translated_string="无法从 pip 提取分支信息";;
+            "PATH_already_contains_python_scripts_user_env") translated_string="PATH 已包含 Python Scripts 在用户环境中。";;
+
+
+            *) translated_string="$key";; # Fall回未翻译的键
         esac
     else # English
         case "$key" in
@@ -317,6 +332,20 @@ translate() {
             "error_pip_required") translated_string="pip3 is required";;
             "error_git_required") translated_string="git is required";;
             "error_path_required") translated_string="PATH must include Python Scripts or ~/.local/bin";;
+            "error_writing_log") printf -v translated_string "Failed to write to log file %s" "$@";;
+            "error_apt_update") translated_string="apt update failed";;
+            "error_install_failed") translated_string="Installation failed";;
+            "error_homebrew_install") translated_string="Homebrew installation failed";;
+            "error_unsupported_os_manual_install") translated_string="Unsupported OS, please manually install Python 3.9+";;
+            "error_download_get_pip") translated_string="Failed to download get-pip.py";;
+            "error_update_path") translated_string="Failed to update PATH";;
+            "error_pip_not_found_check_branch") translated_string="pip not found, cannot check starsignal branch information";;
+            "error_cannot_clean_saves") translated_string="Failed to clean save files";;
+            "current_status") translated_string="Current Status";;
+            "found_starsignal_not_in_path_hint") printf -v translated_string "Found starsignal in %s, but not in PATH" "$@";;
+            "starsignal_branch_info_unavailable") translated_string="Failed to extract branch information from pip";;
+            "PATH_already_contains_python_scripts_user_env") translated_string="PATH already contains Python Scripts in user environment.";;
+
             *) translated_string="$key";; # Fallback for untranslated keys
         esac
     fi
@@ -328,12 +357,14 @@ translate() {
 detect_language "$@"
 
 # 确保日志文件可写
+# 如果是root用户，默认日志文件在 /root/.starsignal_install.log
 if [ "$(whoami)" = "root" ]; then
     LOG_FILE="/root/.starsignal_install.log"
 fi
 touch "$LOG_FILE" 2>/dev/null || {
+    # 如果无法在默认位置写入，则尝试使用 /tmp
     LOG_FILE="/tmp/starsignal_install_$$.log"
-    echo "$(translate "error" "无法写入日志文件 $HOME/.starsignal_install.log")" >&2
+    echo "$(translate "error" "$(translate "error_writing_log" "$HOME/.starsignal_install.log")")" >&2
 }
 chmod 666 "$LOG_FILE" 2>/dev/null
 
@@ -368,6 +399,7 @@ done
 
 if [ "$lang_arg_present" -eq 0 ]; then
     printf "$(translate "choose_lang")"
+    # 强制从 /dev/tty 读取，以确保即使 stdin 被重定向也能获取用户输入
     read -r chosen_lang < /dev/tty
     case "$chosen_lang" in
         "en"|"En"|"EN") LANG_MODE="en";;
@@ -408,16 +440,17 @@ show_progress() {
     action_key="$1" # 动作的翻译键（例如："installing"）
     action_arg="${2:-}" # 动作的可选参数（例如：分支名称）
 
+    # 改进的进度条样式
     for i in 1 2 3 4 5 6 7 8; do
         case $i in
-            1) BAR=">      ";;
-            2) BAR="=>     ";;
-            3) BAR="==>    ";;
-            4) BAR="===>   ";;
-            5) BAR="====>  ";;
-            6) BAR="=====> ";;
-            7) BAR="======>";;
-            8) BAR="=======>";;
+            1) BAR=">       ";; # 8 spaces for fixed length
+            2) BAR="=>      ";;
+            3) BAR="==>     ";;
+            4) BAR="===>    ";;
+            5) BAR="====>   ";;
+            6) BAR="=====>  ";;
+            7) BAR="======> ";;
+            8) BAR="========>";;
         esac
         printf "\r$(translate "progress" "$BAR")"
         sleep 0.3
@@ -490,24 +523,36 @@ check_python() {
     elif command_exists python; then
         PYTHON_CMD="python"
     else
-        PYTHON_CMD=""
+        PYTHON_CMD="" # 确保如果未找到则为空
         log "$(translate "python_not_found_msg")"
-        return 1
+        return 1 # 未找到 Python
     fi
 
-    PYTHON_VERSION=$("$PYTHON_CMD" --version 2>&1 | awk '{print $2}')
+    local current_python_version_full=$("$PYTHON_CMD" --version 2>&1 | awk '{print $2}')
+    PYTHON_VERSION="$current_python_version_full" # 保存完整版本号
     log "$(translate "found_python" "$PYTHON_VERSION")"
-    MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
-    MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
-    if [ "$MAJOR" -lt 3 ] || { [ "$MAJOR" -eq 3 ] && [ "$MINOR" -lt 6 ]; }; then
+
+    # 将版本号拆分为主次版本号进行比较
+    local major_version=$(echo "$PYTHON_VERSION" | cut -d. -f1)
+    local minor_version=$(echo "$PYTHON_VERSION" | cut -d. -f2)
+    local min_major=$(echo "$PYTHON_MIN_VERSION" | cut -d. -f1)
+    local min_minor=$(echo "$PYTHON_MIN_VERSION" | cut -d. -f2)
+    local rec_major=$(echo "$PYTHON_RECOMMENDED_VERSION" | cut -d. -f1)
+    local rec_minor=$(echo "$PYTHON_RECOMMENDED_VERSION" | cut -d. -f2)
+
+    if [ "$major_version" -lt "$min_major" ] || \
+       { [ "$major_version" -eq "$min_major" ] && [ "$minor_version" -lt "$min_minor" ]; }; then
         log "$(translate "python_outdated" "$PYTHON_VERSION" "$PYTHON_MIN_VERSION")"
-        return 1
+        return 1 # 版本过旧（低于最低要求）
     fi
-    if [ "$MAJOR" -eq 3 ] && [ "$MINOR" -lt 9 ]; then
+
+    if [ "$major_version" -lt "$rec_major" ] || \
+       { [ "$major_version" -eq "$rec_major" ] && [ "$minor_version" -lt "$rec_minor" ]; }; then
         log "$(translate "python_upgrade_prompt" "$PYTHON_VERSION" "$PYTHON_RECOMMENDED_VERSION")"
-        return 2
+        return 2 # 版本较低（低于推荐）
     fi
-    return 0
+
+    return 0 # 版本正常
 }
 
 # 安装 Python
@@ -518,37 +563,46 @@ install_python() {
     [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && die "$(translate "python_install_cancelled")"
     case "$OS" in
         ubuntu|debian)
-            sudo apt-get update || die "$(translate "error" "apt update 失败")"
-            sudo apt-get install -y python3 python3-dev || die "$(translate "error" "Python 安装失败")"
+            sudo apt-get update || die "$(translate "error" "$(translate "error_apt_update")")"
+            # 尝试安装推荐版本，如果不行就安装默认的
+            sudo apt-get install -y python3.9 python3.9-dev || sudo apt-get install -y python3 python3-dev || die "$(translate "error" "$(translate "error_install_failed")")"
+            if command_exists python3.9; then PYTHON_CMD="python3.9"; else PYTHON_CMD="python3"; fi
             ;;
         centos|rhel)
+            # CentOS/RHEL 7 默认 Python3 版本较低，通常需要通过 SCL 安装新版本
             sudo yum install -y centos-release-scl || die "$(translate "error" "无法安装 SCL 仓库")"
             sudo yum install -y rh-python39 rh-python39-python-devel || die "$(translate "error" "Python 3.9 安装失败")"
-            scl enable rh-python39 bash
+            # 激活 SCL 中的 Python 环境
+            export PATH="/opt/rh/rh-python39/root/usr/bin:$PATH"
+            PYTHON_CMD="python3" # SCL 的 python3 命令通常指向其提供的版本
+            hash -r # 更新 shell 对命令的查找路径
             ;;
         macos)
             if command_exists brew; then
-                brew install python3 || die "$(translate "error" "Python 安装失败")"
+                brew install python@3.9 || brew install python3 || die "$(translate "error" "$(translate "error_install_failed")")"
             else
                 log "$(translate "installing_homebrew")"
-                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || die "$(translate "error" "Homebrew 安装失败")"
-                brew install python3 || die "$(translate "error" "Python 安装失败")"
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || die "$(translate "error" "$(translate "error_homebrew_install")")"
+                brew install python@3.9 || brew install python3 || die "$(translate "error" "$(translate "error_install_failed")")"
             fi
+            if command_exists python3.9; then PYTHON_CMD="python3.9"; else PYTHON_CMD="python3"; fi
             ;;
         windows)
             if command_exists winget; then
-                winget install --id Python.Python.3.9 -e || die "$(translate "error" "Python 安装失败")"
+                winget install --id Python.Python.3.9 -e || die "$(translate "error" "$(translate "error_install_failed")")"
+                PYTHON_CMD="python" # winget 安装后通常在 PATH 中是 python.exe
             else
                 log "$(translate "正在安装 winget...")"
                 powershell -Command "Invoke-WebRequest -Uri https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle -OutFile winget.msixbundle; Add-AppxPackage winget.msixbundle" 2>/dev/null
-                winget install --id Python.Python.3.9 -e || die "$(translate "error" "Python 安装失败")"
+                winget install --id Python.Python.3.9 -e || die "$(translate "error" "$(translate "error_install_failed")")"
+                PYTHON_CMD="python"
             fi
             ;;
         *)
-            die "$(translate "error" "不支持的操作系统，请手动安装 Python 3.9+")"
+            die "$(translate "error" "$(translate "error_unsupported_os_manual_install")")"
             ;;
     esac
-    check_python || die "$(translate "error" "Python 安装失败")"
+    check_python || die "$(translate "error" "$(translate "Python 安装失败")")" # 再次检查以确保 PYTHON_CMD 已设置
     log "$(translate "python_install_success")"
 }
 
@@ -561,31 +615,33 @@ check_pip() {
     else
         PIP_CMD=""
         log "$(translate "pip_not_found")"
-        return 1
+        return 1 # 未找到 pip
     fi
-    PIP_VERSION=$("$PIP_CMD" --version 2>&1 | awk '{print $2}')
+
+    local current_pip_version_full=$("$PIP_CMD" --version 2>&1 | awk '{print $2}')
+    PIP_VERSION="$current_pip_version_full" # 保存完整版本号
     log "$(translate "found_pip" "$PIP_VERSION")"
-    MAJOR=$(echo "$PIP_VERSION" | cut -d. -f1)
-    if [ "$MAJOR" -lt 20 ]; then
+
+    local major_version=$(echo "$PIP_VERSION" | cut -d. -f1)
+    if [ "$major_version" -lt 20 ]; then # pip 版本 20.x 开始有较大变化
         log "$(translate "pip_upgrade_prompt" "$PIP_VERSION")"
-        return 2
+        return 2 # 版本过旧
     fi
-    return 0
+    return 0 # 版本正常
 }
 
 # 升级 pip
 upgrade_pip() {
     log "$(translate "正在升级 pip...")"
-    printf "$(translate "pip_upgrade_prompt" "$PIP_VERSION") "
+    printf "$(translate "confirm_action" "$(translate "pip_upgrade_action")") "
     read -r confirm < /dev/tty
-    [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && return 1
-    if check_python; then
-        "$PYTHON_CMD" -m pip install --upgrade pip || die "$(translate "error" "pip 升级失败")"
-        check_pip || die "$(translate "error" "pip 升级后仍不可用")"
-        log "$(translate "pip_install_success")"
-    else
-        die "$(translate "error" "需要 Python 以升级 pip")"
+    [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && return 1 # 用户选择不升级
+    if [ -z "$PYTHON_CMD" ]; then # 确保 Python 已被检测到
+        check_python || die "$(translate "error" "$(translate "error_python_required")")"
     fi
+    "$PYTHON_CMD" -m pip install --upgrade pip || die "$(translate "error" "pip 升级失败")"
+    check_pip || die "$(translate "error" "pip 升级后仍不可用")"
+    log "$(translate "pip_install_success")" # 复用成功安装的翻译
 }
 
 # 安装 pip
@@ -594,18 +650,19 @@ install_pip() {
     printf "$(translate "confirm_action" "$(translate "confirm_install_pip")") "
     read -r confirm < /dev/tty
     [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && die "$(translate "pip_install_cancelled")"
-    if check_python; then
-        "$PYTHON_CMD" -m ensurepip --upgrade 2>/dev/null || {
-            log "$(translate "ensurepip_failed")"
-            curl -s https://bootstrap.pypa.io/get-pip.py -o get-pip.py || die "$(translate "error" "无法下载 get-pip.py")"
-            "$PYTHON_CMD" get-pip.py --user || die "$(translate "error" "pip 安装失败")"
-            rm -f get-pip.py
-        }
-        check_pip || die "$(translate "error" "pip 安装失败")"
-        log "$(translate "pip_install_success")"
-    else
-        die "$(translate "error" "需要 Python 以安装 pip")"
+    if [ -z "$PYTHON_CMD" ]; then # 确保 Python 已被检测到
+        check_python || die "$(translate "error" "$(translate "error_python_required")")"
     fi
+    "$PYTHON_CMD" -m ensurepip --upgrade 2>/dev/null || {
+        log "$(translate "ensurepip_failed")"
+        curl -s https://bootstrap.pypa.io/get-pip.py -o get-pip.py || die "$(translate "error" "$(translate "error_download_get_pip")")"
+        "$PYTHON_CMD" get-pip.py --user || die "$(translate "error" "pip 安装失败")"
+        rm -f get-pip.py
+    }
+    # 确保 pip 的安装路径在 PATH 中 (这部分由 fix_path 处理，但这里做个快速检查)
+    # 自动修复 PATH 逻辑在 fix_environment 或安装/更新完成后触发
+    check_pip || die "$(translate "error" "pip 安装失败")"
+    log "$(translate "pip_install_success")"
 }
 
 # 检查 git
@@ -613,16 +670,16 @@ check_git() {
     if command_exists git; then
         GIT_VERSION=$(git --version 2>&1 | awk '{print $3}')
         log "$(translate "found_git" "$GIT_VERSION")"
-        MAJOR=$(echo "$GIT_VERSION" | cut -d. -f1)
-        MINOR=$(echo "$GIT_VERSION" | cut -d. -f2)
-        if [ "$MAJOR" -lt 2 ] && [ "$MINOR" -lt 9 ]; then
+        local major_version=$(echo "$GIT_VERSION" | cut -d. -f1)
+        local minor_version=$(echo "$GIT_VERSION" | cut -d. -f2)
+        if [ "$major_version" -lt 2 ] || { [ "$major_version" -eq 2 ] && [ "$minor_version" -lt 9 ]; }; then # 推荐 Git 2.9+
             log "$(translate "dependency_status_outdated" "git" "$GIT_VERSION" "2.9+")"
-            return 2
+            return 2 # 版本过旧
         fi
-        return 0
+        return 0 # 版本正常
     fi
     log "$(translate "git_not_found")"
-    return 1
+    return 1 # 未找到 git
 }
 
 # 安装 git
@@ -633,77 +690,67 @@ install_git() {
     [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && die "$(translate "git_install_cancelled")"
     case "$OS" in
         ubuntu|debian)
-            sudo apt-get update || die "$(translate "error" "apt update 失败")"
-            sudo apt-get install -y git || die "$(translate "error" "git 安装失败")"
+            sudo apt-get update || die "$(translate "error" "$(translate "error_apt_update")")"
+            sudo apt-get install -y git || die "$(translate "error" "$(translate "error_install_failed")")"
             ;;
         centos|rhel)
-            sudo yum install -y git || die "$(translate "error" "git 安装失败")"
+            sudo yum install -y git || die "$(translate "error" "$(translate "error_install_failed")")"
             ;;
         macos)
             if command_exists brew; then
-                brew install git || die "$(translate "error" "git 安装失败")"
+                brew install git || die "$(translate "error" "$(translate "error_install_failed")")"
             else
                 log "$(translate "installing_homebrew")"
-                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || die "$(translate "error" "Homebrew 安装失败")"
-                brew install git || die "$(translate "error" "git 安装失败")"
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || die "$(translate "error" "$(translate "error_homebrew_install")")"
+                brew install git || die "$(translate "error" "$(translate "error_install_failed")")"
             fi
             ;;
         windows)
             if command_exists winget; then
-                winget install --id Git.Git -e || die "$(translate "error" "git 安装失败")"
+                winget install --id Git.Git -e || die "$(translate "error" "$(translate "error_install_failed")")"
             else
                 log "$(translate "正在安装 winget...")"
                 powershell -Command "Invoke-WebRequest -Uri https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle -OutFile winget.msixbundle; Add-AppxPackage winget.msixbundle" 2>/dev/null
-                winget install --id Git.Git -e || die "$(translate "error" "git 安装失败")"
+                winget install --id Git.Git -e || die "$(translate "error" "$(translate "error_install_failed")")"
             fi
             ;;
         *)
-            die "$(translate "error" "不支持的操作系统，请手动安装 git")"
+            die "$(translate "error" "$(translate "error_unsupported_os_manual_install")")"
             ;;
     esac
-    check_git || die "$(translate "error" "git 安装失败")"
+    check_git || die "$(translate "error" "$(translate "git 安装失败")")"
     log "$(translate "git_install_success")"
 }
 
 # 检查 PATH
 check_path() {
+    local shell_path_status=1 # 默认 PATH 不包含必要路径
+
     if [ "$OS" = "windows" ]; then
         local python_user_scripts=""
         if [ -n "$PYTHON_CMD" ]; then
-            python_user_scripts=$("$PYTHON_CMD" -c "import site; print(site.USER_BASE + '\\Scripts')")
+            python_user_scripts=$("$PYTHON_CMD" -c "import site; print(site.USER_BASE + '\\Scripts')" 2>/dev/null)
         fi
         if [ -n "$python_user_scripts" ] && powershell -Command "[Environment]::GetEnvironmentVariable('Path', 'User')" | grep -qi "$python_user_scripts"; then
             log "$(translate "path_contains_python_scripts")"
-            return 0
-        fi
-        log "$(translate "path_no_python_scripts")"
-        return 1
-    else
-        SHELL_CONFIG=""
-        if [ "$(whoami)" = "root" ]; then
-            SHELL_CONFIG="/root/.bashrc"
-            if echo "$PATH" | grep -q "/root/.local/bin"; then
-                log "$(translate "path_contains_root_local_bin")"
-                return 0
-            fi
-            log "$(translate "path_no_root_local_bin")"
-            return 1
+            shell_path_status=0
         else
-            if [ -n "$ZSH_VERSION" ]; then
-                SHELL_CONFIG="$HOME/.zshrc"
-            elif [ -n "$BASH_VERSION" ]; then
-                SHELL_CONFIG="$HOME/.bashrc"
-            else
-                SHELL_CONFIG="$HOME/.profile"
-            fi
-            if echo "$PATH" | grep -q "$HOME/.local/bin"; then
-                log "$(translate "path_contains_local_bin")"
-                return 0
-            fi
-            log "$(translate "path_no_local_bin")"
-            return 1
+            log "$(translate "path_no_python_scripts")"
+        fi
+    else
+        local local_bin_path="$HOME/.local/bin"
+        if [ "$(whoami)" = "root" ]; then
+            local_bin_path="/root/.local/bin"
+        fi
+
+        if echo "$PATH" | grep -q "$local_bin_path"; then
+            log "$(translate "path_contains_local_bin" "$local_bin_path")" # New translation key
+            shell_path_status=0
+        else
+            log "$(translate "path_no_local_bin" "$local_bin_path")" # New translation key
         fi
     fi
+    return "$shell_path_status"
 }
 
 # 修复 PATH
@@ -712,23 +759,27 @@ fix_path() {
     if [ "$OS" = "windows" ]; then
         local python_user_scripts=""
         if [ -n "$PYTHON_CMD" ]; then
-            python_user_scripts=$("$PYTHON_CMD" -c "import site; print(site.USER_BASE + '\\Scripts')")
+            python_user_scripts=$("$PYTHON_CMD" -c "import site; print(site.USER_BASE + '\\Scripts')" 2>/dev/null)
         fi
         if [ -z "$python_user_scripts" ]; then
-            python_user_scripts="$HOME/AppData/Roaming/Python/Python39/Scripts"
+            python_user_scripts="$HOME/AppData/Roaming/Python/Python39/Scripts" # Fallback
         fi
+
         if [ -n "$python_user_scripts" ] && ! powershell -Command "[Environment]::GetEnvironmentVariable('Path', 'User')" | grep -qi "$python_user_scripts"; then
-            powershell -Command "[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ';$python_user_scripts', 'User')" || die "$(translate "error" "无法更新 PATH")"
-            export PATH="$python_user_scripts:$PATH"
+            powershell -Command "[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ';$python_user_scripts', 'User')" || die "$(translate "error" "$(translate "error_update_path")")"
+            export PATH="$python_user_scripts:$PATH" # Export for current session
             log "$(translate "path_updated_reboot_win")"
         else
-            log "$(translate "path_contains_python_scripts")"
+            log "$(translate "PATH_already_contains_python_scripts_user_env")"
         fi
     else
         SHELL_CONFIG=""
+        local path_to_add=""
+        local local_bin_path="$HOME/.local/bin"
+
         if [ "$(whoami)" = "root" ]; then
             SHELL_CONFIG="/root/.bashrc"
-            PATH_TO_ADD="/root/.local/bin:/usr/local/bin"
+            local_bin_path="/root/.local/bin"
         else
             if [ -n "$ZSH_VERSION" ]; then
                 SHELL_CONFIG="$HOME/.zshrc"
@@ -737,27 +788,58 @@ fix_path() {
             else
                 SHELL_CONFIG="$HOME/.profile"
             fi
-            PATH_TO_ADD="$HOME/.local/bin:/usr/local/bin"
         fi
-        if ! grep -q "export PATH=\"\${PATH_TO_ADD}:\$PATH\"" "$SHELL_CONFIG" 2>/dev/null; then
-            echo "export PATH=\"${PATH_TO_ADD}:\$PATH\"" >> "$SHELL_CONFIG"
+
+        # 检查是否已包含 .local/bin
+        if ! grep -q "export PATH=.*${local_bin_path}:" "$SHELL_CONFIG" 2>/dev/null && \
+           ! grep -q "export PATH=\"\$PATH:.*${local_bin_path}\"" "$SHELL_CONFIG" 2>/dev/null; then
+            # 如果不包含，则添加到 PATH 的开头
+            echo "export PATH=\"${local_bin_path}:\$PATH\"" >> "$SHELL_CONFIG"
             log "$(translate "path_config_updated" "$SHELL_CONFIG")"
         else
             log "$(translate "path_already_contains_local_bin" "$SHELL_CONFIG")"
         fi
-        export PATH="${PATH_TO_ADD}:$PATH"
+        export PATH="${local_bin_path}:$PATH" # Export for current session
         echo "$(translate "path_updated_reboot_linux_macos" "$SHELL_CONFIG")"
     fi
-    check_path || die "$(translate "error" "无法验证 PATH 更新")"
+    check_path || die "$(translate "error" "$(translate "无法验证 PATH 更新")")"
 }
 
 # 检查 starsignal 安装
 check_starsignal() {
+    local starsignal_status=1 # 默认未安装
     if command_exists starsignal; then
         STARSIGNAL_VERSION=$(starsignal --version 2>/dev/null | awk '{print $2}')
         log "$(translate "found_starsignal" "$STARSIGNAL_VERSION")"
+        starsignal_status=0 # 已找到并可执行
+    else
+        # 如果 starsignal 命令不在 PATH 中，尝试在常见安装路径查找
+        local possible_paths
+        if [ "$(whoami)" = "root" ]; then
+            possible_paths="/root/.local/bin/starsignal /usr/local/bin/starsignal"
+        else
+            possible_paths="$HOME/.local/bin/starsignal /usr/local/bin/starsignal"
+        fi
+
+        for path in $possible_paths; do
+            if [ -x "$path" ]; then
+                log "$(translate "found_starsignal_not_in_path_hint" "$path")"
+                # 尝试修复 PATH，然后重新检查
+                fix_path
+                if command_exists starsignal; then
+                    STARSIGNAL_VERSION=$(starsignal --version 2>/dev/null | awk '{print $2}')
+                    log "$(translate "found_starsignal" "$STARSIGNAL_VERSION")" # 修复后再次日志
+                    starsignal_status=0
+                    break
+                fi
+            fi
+        done
+    fi
+
+    # 检查 PIP 信息，无论 starsignal 是否在 PATH 中
+    if [ "$starsignal_status" -eq 0 ]; then
         if [ -z "$PIP_CMD" ]; then
-            check_pip || { log "$(translate "error" "pip 未找到，无法检查分支")"; INSTALLED_BRANCH="未知"; return 0; }
+            check_pip || { log "$(translate "error" "$(translate "error_pip_not_found_check_branch")")"; INSTALLED_BRANCH="未知"; return 0; }
         fi
         PIP_INFO=$("$PIP_CMD" show starsignal 2>/dev/null)
         if [ -n "$PIP_INFO" ]; then
@@ -765,32 +847,21 @@ check_starsignal() {
             log "$(translate "installed_branch_source" "${INSTALLED_BRANCH:-未知}")"
         else
             INSTALLED_BRANCH="未知"
-            log "$(translate "无法从 pip 提取分支信息")"
+            log "$(translate "starsignal_branch_info_unavailable")"
         fi
-        return 0
     else
-        # 检查可能的安装路径
-        for path in "$HOME/.local/bin/starsignal" "/root/.local/bin/starsignal" "/usr/local/bin/starsignal"; do
-            if [ -x "$path" ]; then
-                log "$(translate "found_starsignal" "在 $path 中找到，但不在 PATH 中")"
-                fix_path
-                if command_exists starsignal; then
-                    STARSIGNAL_VERSION=$(starsignal --version 2>/dev/null | awk '{print $2}')
-                    log "$(translate "found_starsignal" "$STARSIGNAL_VERSION")")
-                    return 0
-                fi
-            fi
-        done
         log "$(translate "starsignal_not_installed_status_msg")"
-        return 1
     fi
+    return "$starsignal_status"
 }
+
 
 # 检查存档文件
 check_saves() {
     if [ "$OS" = "windows" ]; then
         powershell -Command "Test-Path \$env:USERPROFILE\.starsignal*" | grep -q "True"
     else
+        # 检查用户目录和root目录下的存档文件
         ls "$HOME/.starsignal"* >/dev/null 2>&1 || ls "/root/.starsignal"* >/dev/null 2>&1
     fi
     return $?
@@ -802,7 +873,9 @@ fix_permissions() {
     if [ "$OS" = "windows" ]; then
         powershell -Command "Get-ChildItem -Path \$env:USERPROFILE\.starsignal* | ForEach-Object { icacls \$_.FullName /grant Everyone:F }" 2>/dev/null || log "$(translate "permission_warning")"
     else
-        chmod 666 "$HOME/.starsignal"* 2>/dev/null || chmod 666 "/root/.starsignal"* 2>/dev/null || log "$(translate "permission_warning")"
+        # 修复用户目录和root目录下的存档文件权限
+        chmod 666 "$HOME/.starsignal"* 2>/dev/null
+        chmod 666 "/root/.starsignal"* 2>/dev/null || log "$(translate "permission_warning")"
     fi
     log "$(translate "权限修复完成")"
 }
@@ -812,9 +885,11 @@ install_starsignal() {
     if [ -z "$PIP_CMD" ]; then
         check_pip || die "$(translate "error" "$(translate "error_pip_required")")"
     fi
-    if check_pip && [ "$(check_pip; echo $?)" -eq 2 ]; then
-        upgrade_pip
+    local pip_check_result=$(check_pip; echo $?)
+    if [ "$pip_check_result" -eq 2 ]; then # pip 版本过旧，提示升级
+        upgrade_pip || log "$(translate "pip_upgrade_cancelled")" # 用户选择不升级，日志记录
     fi
+
     echo "$(translate "branch_prompt")"
     printf "$(translate "choose_branch") "
     read -r branch_choice < /dev/tty
@@ -827,11 +902,33 @@ install_starsignal() {
     read -r confirm < /dev/tty
     [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && die "$(translate "install_cancelled")"
     show_progress "installing" "$BRANCH"
+    # 使用 --no-warn-script-location 避免 pip 在安装可执行脚本时发出警告
     "$PIP_CMD" install --user --force-reinstall --no-warn-script-location "git+$REPO_URL@$BRANCH" || {
-        echo "$(translate "error" "pip 安装失败，尝试使用 virtualenv")"
-        "$PYTHON_CMD" -m venv starsignal_env
-        . starsignal_env/bin/activate
-        pip install "git+$REPO_URL@$BRANCH" || die "$(translate "error" "安装失败")"
+        log "$(translate "error" "pip 安装失败，尝试使用 virtualenv")"
+        # 尝试使用 virtualenv 隔离安装
+        if [ -n "$PYTHON_CMD" ]; then
+            "$PYTHON_CMD" -m venv "$HOME/starsignal_env" || "$PYTHON_CMD" -m venv "/tmp/starsignal_env" || die "$(translate "error" "无法创建虚拟环境")"
+            local venv_path="$HOME/starsignal_env"
+            if [ ! -d "$venv_path" ]; then venv_path="/tmp/starsignal_env"; fi
+
+            log "激活虚拟环境：$venv_path/bin/activate"
+            # 兼容不同shell和Windows的激活方式
+            if [ "$OS" = "windows" ]; then
+                powershell -Command "& \"$venv_path/Scripts/activate\""
+            else
+                . "$venv_path/bin/activate"
+            fi
+            
+            # 重新检查 pip 命令在虚拟环境中是否可用
+            check_pip # 确保PIP_CMD在虚拟环境中是正确的
+            "$PIP_CMD" install --no-warn-script-location "git+$REPO_URL@$BRANCH" || die "$(translate "error" "虚拟环境安装失败")"
+            log "已安装到虚拟环境：$venv_path"
+            log "请运行 'source $venv_path/bin/activate' 后执行 'starsignal' 启动。"
+            log "（Windows: 请运行 '$venv_path\\Scripts\\activate.ps1' 或 '$venv_path\\Scripts\\activate.bat' 后执行 'starsignal' 启动。）"
+            die "$(translate "error" "安装完成，但需要手动激活虚拟环境")"
+        else
+            die "$(translate "error" "安装失败，且未找到 Python，无法尝试虚拟环境")"
+        fi
     }
     "$PIP_CMD" install --user colorama 2>/dev/null || log "$(translate "warning_colorama_install_fail")"
     fix_permissions
@@ -839,7 +936,7 @@ install_starsignal() {
         fix_path
     fi
     check_starsignal || {
-        log "$(translate "error" "starsignal 未在 PATH 中，检查 ~/.local/bin 或 /root/.local/bin")"
+        log "$(translate "error" "starsignal 未在 PATH 中，请检查 ~/.local/bin 或 /root/.local/bin")"
         die "$(translate "error" "安装验证失败，请检查 PATH 或手动安装")"
     }
     log "$(translate "starsignal 安装成功，分支：$BRANCH")"
@@ -851,9 +948,11 @@ update_starsignal() {
     if [ -z "$PIP_CMD" ]; then
         check_pip || die "$(translate "error" "$(translate "error_pip_required")")"
     fi
-    if check_pip && [ "$(check_pip; echo $?)" -eq 2 ]; then
-        upgrade_pip
+    local pip_check_result=$(check_pip; echo $?)
+    if [ "$pip_check_result" -eq 2 ]; then # pip 版本过旧，提示升级
+        upgrade_pip || log "$(translate "pip_upgrade_cancelled")"
     fi
+
     echo "$(translate "branch_prompt")"
     printf "$(translate "choose_branch") "
     read -r branch_choice < /dev/tty
@@ -883,9 +982,11 @@ repair_starsignal() {
     if [ -z "$PIP_CMD" ]; then
         check_pip || die "$(translate "error" "$(translate "error_pip_required")")"
     fi
-    if check_pip && [ "$(check_pip; echo $?)" -eq 2 ]; then
-        upgrade_pip
+    local pip_check_result=$(check_pip; echo $?)
+    if [ "$pip_check_result" -eq 2 ]; then # pip 版本过旧，提示升级
+        upgrade_pip || log "$(translate "pip_upgrade_cancelled")"
     fi
+
     if check_starsignal; then
         INSTALLED_BRANCH_INFO=$("$PIP_CMD" show starsignal 2>/dev/null | grep -i "Location" | sed -n 's/.*@\([^#]*\).*#egg=starsignal/\1/p')
         BRANCH=${INSTALLED_BRANCH_INFO:-"main"}
@@ -917,7 +1018,7 @@ clean_saves() {
         echo "$(translate "cleaning_saves")"
         local found_saves
         if [ "$OS" = "windows" ]; then
-            found_saves=$(powershell -Command "Get-ChildItem -Path \$env:USERPROFILE\.starsignal* | Select-Object -ExpandProperty Name")
+            found_saves=$(powershell -Command "Get-ChildItem -Path \$env:USERPROFILE\.starsignal* | Select-Object -ExpandProperty Name" 2>/dev/null)
         else
             found_saves=$(ls "$HOME/.starsignal"* 2>/dev/null || ls "/root/.starsignal"* 2>/dev/null)
         fi
@@ -926,9 +1027,9 @@ clean_saves() {
         read -r confirm < /dev/tty
         if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
             if [ "$OS" = "windows" ]; then
-                powershell -Command "Remove-Item -Path \$env:USERPROFILE\.starsignal* -Force" || die "$(translate "error" "无法清理存档")"
+                powershell -Command "Remove-Item -Path \$env:USERPROFILE\.starsignal* -Force" || die "$(translate "error" "$(translate "error_cannot_clean_saves")")"
             else
-                rm -f "$HOME/.starsignal"* "/root/.starsignal"* 2>/dev/null || die "$(translate "error" "无法清理存档")"
+                rm -f "$HOME/.starsignal"* "/root/.starsignal"* 2>/dev/null || die "$(translate "error" "$(translate "error_cannot_clean_saves")")"
             fi
             log "$(translate "存档文件清理完成")"
             echo "$(translate "save_files_deleted")"
@@ -967,132 +1068,93 @@ fix_environment() {
     echo "$(translate "env_dependencies_checking")"
     local all_dependencies_met=true
 
-    # Python 检查和安装
-    case $(check_python; echo $?) in
-        0)
-            echo "$(translate "dependency_status_found" "Python3" "$PYTHON_VERSION")"
-            ;;
-        1)
-            echo "$(translate "dependency_status_not_found" "Python3")"
-            printf "$(translate "python_not_found" "$PYTHON_MIN_VERSION") "
-            read -r install_python_choice < /dev/tty
-            if [ "$install_python_choice" = "y" ] || [ "$install_python_choice" = "Y" ]; then
-                install_python
-                if check_python; then
-                    echo "$(translate "dependency_status_ok" "Python3")"
-                else
-                    echo "$(translate "dependency_status_not_found" "Python3")"
-                    all_dependencies_met=false
-                fi
-            else
-                all_dependencies_met=false
-                log "$(translate "error" "$(translate "error_python_required")")"
-            fi
-            ;;
-        2)
-            echo "$(translate "dependency_status_outdated" "Python3" "$PYTHON_VERSION" "$PYTHON_RECOMMENDED_VERSION")"
-            printf "$(translate "python_upgrade_prompt" "$PYTHON_VERSION" "$PYTHON_RECOMMENDED_VERSION") "
-            read -r upgrade_python_choice < /dev/tty
-            if [ "$upgrade_python_choice" = "y" ] || [ "$upgrade_python_choice" = "Y" ]; then
-                install_python
-                if check_python; then
-                    echo "$(translate "dependency_status_ok" "Python3")"
-                else
-                    echo "$(translate "dependency_status_not_found" "Python3")"
-                    all_dependencies_met=false
-                fi
-            else
-                echo "$(translate "dependency_status_ok" "Python3")"
-            fi
-            ;;
-    esac
+    # Python 检查和安装/升级
+    local python_status=$(check_python; echo $?)
+    if [ "$python_status" -eq 0 ]; then
+        echo "$(translate "dependency_status_ok" "Python3")"
+    elif [ "$python_status" -eq 1 ]; then
+        echo "$(translate "dependency_status_not_found" "Python3")"
+        printf "$(translate "python_not_found" "$PYTHON_MIN_VERSION") "
+        read -r install_python_choice < /dev/tty
+        if [ "$install_python_choice" = "y" ] || [ "$install_python_choice" = "Y" ]; then
+            install_python
+            if [ "$(check_python; echo $?)" -ne 0 ]; then all_dependencies_met=false; fi
+        else
+            all_dependencies_met=false
+            log "$(translate "error" "$(translate "error_python_required")")"
+        fi
+    elif [ "$python_status" -eq 2 ]; then
+        echo "$(translate "dependency_status_outdated" "Python3" "$PYTHON_VERSION" "$PYTHON_RECOMMENDED_VERSION")"
+        printf "$(translate "python_upgrade_prompt" "$PYTHON_VERSION" "$PYTHON_RECOMMENDED_VERSION") "
+        read -r upgrade_python_choice < /dev/tty
+        if [ "$upgrade_python_choice" = "y" ] || [ "$upgrade_python_choice" = "Y" ]; then
+            install_python
+            if [ "$(check_python; echo $?)" -ne 0 ]; then all_dependencies_met=false; fi
+        else
+            echo "$(translate "dependency_status_ok" "Python3")" # 用户选择不升级，但已满足最低要求
+        fi
+    fi
 
-    # Pip 检查和安装
-    case $(check_pip; echo $?) in
-        0)
-            echo "$(translate "dependency_status_found" "pip3" "$PIP_VERSION")"
-            ;;
-        1)
-            echo "$(translate "dependency_status_not_found" "pip3")"
-            printf "$(translate "pip_not_found") "
-            read -r install_pip_choice < /dev/tty
-            if [ "$install_pip_choice" = "y" ] || [ "$install_pip_choice" = "Y" ]; then
-                install_pip
-                if check_pip; then
-                    echo "$(translate "dependency_status_ok" "pip3")"
-                else
-                    echo "$(translate "dependency_status_not_found" "pip3")"
-                    all_dependencies_met=false
-                fi
-            else
-                all_dependencies_met=false
-                log "$(translate "error" "$(translate "error_pip_required")")"
-            fi
-            ;;
-        2)
-            echo "$(translate "dependency_status_outdated" "pip3" "$PIP_VERSION" "20.x+")"
-            printf "$(translate "pip_upgrade_prompt" "$PIP_VERSION") "
-            read -r upgrade_pip_choice < /dev/tty
-            if [ "$upgrade_pip_choice" = "y" ] || [ "$upgrade_pip_choice" = "Y" ]; then
-                upgrade_pip
-                if check_pip; then
-                    echo "$(translate "dependency_status_ok" "pip3")"
-                else
-                    echo "$(translate "dependency_status_not_found" "pip3")"
-                    all_dependencies_met=false
-                fi
-            else
-                echo "$(translate "dependency_status_ok" "pip3")"
-            fi
-            ;;
-    esac
+    # Pip 检查和安装/升级
+    local pip_status=$(check_pip; echo $?)
+    if [ "$pip_status" -eq 0 ]; then
+        echo "$(translate "dependency_status_ok" "pip3")"
+    elif [ "$pip_status" -eq 1 ]; then
+        echo "$(translate "dependency_status_not_found" "pip3")"
+        printf "$(translate "pip_not_found") "
+        read -r install_pip_choice < /dev/tty
+        if [ "$install_pip_choice" = "y" ] || [ "$install_pip_choice" = "Y" ]; then
+            install_pip
+            if [ "$(check_pip; echo $?)" -ne 0 ]; then all_dependencies_met=false; fi
+        else
+            all_dependencies_met=false
+            log "$(translate "error" "$(translate "error_pip_required")")"
+        fi
+    elif [ "$pip_status" -eq 2 ]; then
+        echo "$(translate "dependency_status_outdated" "pip3" "$PIP_VERSION" "20.x+")"
+        printf "$(translate "pip_upgrade_prompt" "$PIP_VERSION") "
+        read -r upgrade_pip_choice < /dev/tty
+        if [ "$upgrade_pip_choice" = "y" ] || [ "$upgrade_pip_choice" = "Y" ]; then
+            upgrade_pip
+            if [ "$(check_pip; echo $?)" -ne 0 ]; then all_dependencies_met=false; fi
+        else
+            echo "$(translate "dependency_status_ok" "pip3")"
+        fi
+    fi
 
     # Git 检查和安装
-    case $(check_git; echo $?) in
-        0)
-            echo "$(translate "dependency_status_found" "git" "$GIT_VERSION")"
-            ;;
-        1)
-            echo "$(translate "dependency_status_not_found" "git")"
-            printf "$(translate "git_not_found") "
-            read -r install_git_choice < /dev/tty
-            if [ "$install_git_choice" = "y" ] || [ "$install_git_choice" = "Y" ]; then
-                install_git
-                if check_git; then
-                    echo "$(translate "dependency_status_ok" "git")"
-                else
-                    echo "$(translate "dependency_status_not_found" "git")"
-                    all_dependencies_met=false
-                fi
-            else
-                all_dependencies_met=false
-                log "$(translate "error" "$(translate "error_git_required")")"
-            fi
-            ;;
-        2)
-            echo "$(translate "dependency_status_outdated" "git" "$GIT_VERSION" "2.9+")"
-            printf "$(translate "git_not_found") "
-            read -r upgrade_git_choice < /dev/tty
-            if [ "$upgrade_git_choice" = "y" ] || [ "$upgrade_git_choice" = "Y" ]; then
-                install_git
-                if check_git; then
-                    echo "$(translate "dependency_status_ok" "git")"
-                else
-                    echo "$(translate "dependency_status_not_found" "git")"
-                    all_dependencies_met=false
-                fi
-            else
-                echo "$(translate "dependency_status_ok" "git")"
-            fi
-            ;;
-    esac
+    local git_status=$(check_git; echo $?)
+    if [ "$git_status" -eq 0 ]; then
+        echo "$(translate "dependency_status_ok" "git")"
+    elif [ "$git_status" -eq 1 ]; then
+        echo "$(translate "dependency_status_not_found" "git")"
+        printf "$(translate "git_not_found") "
+        read -r install_git_choice < /dev/tty
+        if [ "$install_git_choice" = "y" ] || [ "$install_git_choice" = "Y" ]; then
+            install_git
+            if [ "$(check_git; echo $?)" -ne 0 ]; then all_dependencies_met=false; fi
+        else
+            all_dependencies_met=false
+            log "$(translate "error" "$(translate "error_git_required")")"
+        fi
+    elif [ "$git_status" -eq 2 ]; then
+        echo "$(translate "dependency_status_outdated" "git" "$GIT_VERSION" "2.9+")"
+        printf "$(translate "confirm_action" "$(translate "upgrade_git_action")") "
+        read -r upgrade_git_choice < /dev/tty
+        if [ "$upgrade_git_choice" = "y" ] || [ "$upgrade_git_choice" = "Y" ]; then
+            install_git # 安装函数会处理升级
+            if [ "$(check_git; echo $?)" -ne 0 ]; then all_dependencies_met=false; fi
+        else
+            echo "$(translate "dependency_status_ok" "git")"
+        fi
+    fi
 
     # PATH 检查和修复
     if check_path; then
         echo "$(translate "dependency_status_ok" "PATH")"
     else
         echo "$(translate "dependency_status_missing_path" "PATH")"
-        fix_path
+        fix_path # 自动尝试修复 PATH
         if check_path; then
             echo "$(translate "dependency_status_ok" "PATH")"
         else
@@ -1124,30 +1186,30 @@ fix_environment() {
 main_menu() {
     while true; do
         clear
-        echo "================================="
+        echo "=========================================="
         echo "$(translate "welcome")"
-        echo "================================="
+        echo "=========================================="
         detect_os
 
         log "$(translate "auto_detect_python_pip")"
-        if ! check_python; then
-            PYTHON_CMD=""
-        fi
-        if ! check_pip; then
-            PIP_CMD=""
-        fi
+        # 确保 PYTHON_CMD 和 PIP_CMD 在进入菜单前已尝试自动检测并设置
+        if [ -z "$PYTHON_CMD" ]; then check_python >/dev/null 2>&1; fi
+        if [ -z "$PIP_CMD" ]; then check_pip >/dev/null 2>&1; fi
+
 
         if check_starsignal; then
-            echo "---------------------------------"
+            echo "------------------------------------------"
             echo "$(translate "current_status")"
             printf "$(translate "status_installed" "$STARSIGNAL_VERSION" "${INSTALLED_BRANCH:-未知}")\n"
             check_saves && echo "$(translate "save_files_present")" || echo "$(translate "save_files_none")"
-            echo "---------------------------------"
+            echo "------------------------------------------"
             echo "$(translate "installed_menu")"
             printf "$(translate "choose_option") "
+            # 增加超时，防止无限等待
             read -r -t 60 choice < /dev/tty
             if [ -z "$choice" ]; then
-                continue
+                log "$(translate "Error: No input received for 60 seconds, re-displaying menu.")" # New log message
+                continue # 无输入则重新显示菜单
             fi
             case "$choice" in
                 1) update_starsignal ;;
@@ -1159,15 +1221,16 @@ main_menu() {
                 *) echo "$(translate "invalid_choice")"; sleep 1; continue ;;
             esac
         else
-            echo "---------------------------------"
+            echo "------------------------------------------"
             echo "$(translate "current_status")"
             echo "$(translate "status_not_installed")"
-            echo "---------------------------------"
+            echo "------------------------------------------"
             echo "$(translate "install_menu")"
             printf "$(translate "choose_option") "
             read -r -t 60 choice < /dev/tty
             if [ -z "$choice" ]; then
-                continue
+                log "$(translate "Error: No input received for 60 seconds, re-displaying menu.")"
+                continue # 无输入则重新显示菜单
             fi
             case "$choice" in
                 1) install_starsignal ;;
@@ -1176,16 +1239,16 @@ main_menu() {
                 *) echo "$(translate "invalid_choice")"; sleep 1; continue ;;
             esac
         fi
-        echo "---------------------------------"
+        echo "------------------------------------------"
         echo "$(translate "prompt_press_enter")"
-        read -r _ < /dev/tty
+        read -r _ < /dev/tty # 强制从 /dev/tty 读取
     done
 }
 
-# 处理命令行参数
+# 处理命令行参数 (此循环用于处理参数，应保留)
 while [ $# -gt 0 ]; do
     case "$1" in
-        --lang) shift 2 ;;
+        --lang) shift 2 ;; # 语言参数已在初始 detect_language "$@" 中处理，此处仅消费参数
         *) shift ;;
     esac
 done
