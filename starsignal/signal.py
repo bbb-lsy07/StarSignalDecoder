@@ -19,8 +19,8 @@ class SignalGenerator:
             "replace_char": "忽略非数字字符，替换5为0"
         }
 
-    def generate_signal(self, num_options):
-        length = {"easy": 5, "medium": 7, "hard": 10, "challenge": 8}[self.difficulty]
+    def generate_signal(self, num_options, length=None):
+        length = length or {"easy": 5, "medium": 7, "hard": 10, "challenge": 8}[self.difficulty]
         digits = [str(random.randint(0, 9)) for _ in range(length)]
         symbols = random.choices(string.punctuation, k=length // 2)
         
@@ -55,7 +55,7 @@ class SignalGenerator:
             distractor = ''.join(random.choices("0123456789", k=max(1, len(answer))))
             while distractor == answer or distractor in distractors:
                 distractor = ''.join(random.choices("0123456789", k=max(1, len(answer))))
-            distractors.append(distractor)
+            distractors.append(distr NPector)
         
         strength = random.randint(1, 3)
         return ''.join(signal), self.rule_texts[rule], answer, distractors, strength
