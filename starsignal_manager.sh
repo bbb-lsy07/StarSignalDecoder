@@ -1,6 +1,6 @@
 #!/bin/sh
 # 星际迷航：信号解码管理脚本
-# 版本：1.2.0
+# 版本：1.3.0
 # 作者：bbb-lsy07
 # 许可证：MIT
 # GitHub：https://github.com/bbb-lsy07/StarSignalDecoder
@@ -8,7 +8,7 @@
 # 使用方法：
 #   Linux/macOS：curl -s https://raw.githubusercontent.com/bbb-lsy07/StarSignalDecoder/main/starsignal_manager.sh | sh
 #   Windows：curl -s https://raw.githubusercontent.com/bbb-lsy07/StarSignalDecoder/main/starsignal_manager.sh -o starsignal_manager.sh && sh starsignal_manager.sh
-#   或：下载后运行 sh starsignal_manager.sh
+#   本地运行：chmod +x starsignal_manager.sh && ./starsignal_manager.sh
 
 # 初始化变量
 LOG_FILE="$HOME/.starsignal_install.log"
@@ -17,6 +17,8 @@ DEFAULT_BRANCH="main"
 PYTHON_MIN_VERSION="3.6"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 LANG_MODE="zh"  # 默认中文
+MAX_RETRIES=3
+RETRY_DELAY=5
 
 # 检测语言
 detect_language() {
@@ -40,7 +42,7 @@ translate() {
     key="$1"
     if [ "$LANG_MODE" = "zh" ]; then
         case "$key" in
-            "welcome") echo "星际迷航：信号解码管理器 v1.2.0";;
+            "welcome") echo "星际迷航：信号解码管理器 v1.3.0";;
             "status_installed") echo "状态：已安装（版本：%s，分支：%s）";;
             "status_not_installed") echo "状态：未安装";;
             "save_files_present") echo "存档文件：存在";;
@@ -78,7 +80,7 @@ translate() {
         esac
     else
         case "$key" in
-            "welcome") echo "StarSignalDecoder Manager v1.2.0";;
+            "welcome") echo "StarSignalDecoder Manager v1.3.0";;
             "status_installed") echo "Status: Installed (Version: %s, Branch: %s)";;
             "status_not_installed") echo "Status: Not installed";;
             "save_files_present") echo "Save files: Present";;
@@ -310,7 +312,7 @@ install_pip() {
         check_pip || die "$(translate "error" "pip 安装失败")"
         log "pip 安装成功"
     else
-        die "$(translate "error" "未找到 Python，无法安装 pip")"
+        die "$(translate "error" "未 hindering Python，无法安装 pip")"
     fi
 }
 
