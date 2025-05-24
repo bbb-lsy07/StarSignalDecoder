@@ -1,6 +1,6 @@
 #!/bin/sh
 # 星际迷航：信号解码管理脚本
-# 版本：1.8.1
+# 版本：1.8.2
 # 作者：bbb-lsy07
 # 许可证：MIT
 # GitHub：https://github.com/bbb-lsy07/StarSignalDecoder
@@ -26,7 +26,7 @@ RETRY_DELAY=5
 PYTHON_CMD=""
 PIP_CMD=""
 
-# 检测语言函数 - 仅根据命令行参数或系统设置LANG_MODE
+# 检测语言函数
 detect_language() {
     local lang_arg_set=0
     for i in "$@"; do
@@ -64,7 +64,7 @@ detect_language() {
     fi
 }
 
-# 翻译函数 - 仅返回翻译后的字符串，不打印换行
+# 翻译函数
 translate() {
     key="$1"
     shift
@@ -72,7 +72,7 @@ translate() {
 
     if [ "$LANG_MODE" = "zh" ]; then
         case "$key" in
-            "welcome") translated_string="星际迷航：信号解码管理器 v1.8.1";;
+            "welcome") translated_string="星际迷航：信号解码管理器 v1.8.2";;
             "choose_lang") translated_string="请选择语言 (zh/en) [默认 $(echo "$LANG_MODE" | tr 'a-z' 'A-Z')]: ";;
             "status_installed") printf -v translated_string "状态：已安装（版本：%s，分支：%s）" "$@";;
             "status_not_installed") translated_string="状态：未安装";;
@@ -194,7 +194,7 @@ translate() {
         esac
     else
         case "$key" in
-            "welcome") translated_string="StarSignalDecoder Manager v1.8.1";;
+            "welcome") translated_string="StarSignalDecoder Manager v1.8.2";;
             "choose_lang") translated_string="Please select language (zh/en) [default $(echo "$LANG_MODE" | tr 'a-z' 'A-Z')]: ";;
             "status_installed") printf -v translated_string "Status: Installed (Version: %s, Branch: %s)" "$@";;
             "status_not_installed") translated_string="Status: Not installed";;
@@ -228,7 +228,8 @@ translate() {
             "path_fix_automatic") translated_string="Automatically fixing PATH to include installation paths...";;
             "permission_warning") translated_string="Warning: Failed to fix save file permissions, run: chmod 666 ~/.starsignal* (Windows: icacls \"%USERPROFILE%\\.starsignal*\" /grant Everyone:F)";;
             "progress") printf -v translated_string "[%s] Processing..." "$@";;
-            "error") printf -v translated_string "Error: %s" "$@";;"check_log") printf -v translated_string "Check %s for details" "$@";;
+            "error") printf -v translated_string "Error: %s" "$@";;
+            "check_log") printf -v translated_string "Check %s for details" "$@";;
             "confirm_action") printf -v translated_string "Confirm to proceed with %s? (y/n):" "$@";;
             "error_non_interactive") printf -v translated_string "This script requires an interactive terminal. Please download and execute the script, e.g.:\n%s\n%s" "$@";;
             "error_non_interactive_desc_linux_macos") translated_string="Linux/macOS: curl -s https://raw.githubusercontent.com/bbb-lsy07/StarSignalDecoder/main/starsignal_manager.sh -o starsignal_manager.sh && chmod +x starsignal_manager.sh && ./starsignal_manager.sh";;
@@ -251,7 +252,6 @@ translate() {
             "git_install_success") translated_string="git installed successfully";;
             "path_fix_cancelled") translated_string="PATH fix cancelled";;
             "path_config_updated") printf -v translated_string "PATH updated in %s" "$@";;
-            "path_updated_reboot_win") translated_string="PATH updated, please restart terminal or run 'refreshenv'.";;
             "path_updated_reboot_linux_macos") printf -v translated_string "PATH updated, please run 'source %s' or restart terminal." "$@";;
             "installed_branch_source") printf -v translated_string "Installed branch source: %s" "$@";;
             "save_files_found_list") printf -v translated_string "Found save files: %s" "$@";;
@@ -279,13 +279,13 @@ translate() {
             "env_check_fix_status") translated_string="Checking and fixing environment...";;
             "warning_colorama_install_fail") translated_string="Warning: colorama installation failed, color display might be affected";;
             "warning_colorama_update_fail") translated_string="Warning: colorama update failed";;
-            "found_python") printf -v translated_string "Found Python: %s" "$@";;
+            "found_python") printf -v translated_string "找到 Python：%s" "$@";;
             "python_outdated") printf -v translated_string "Python %s is outdated, need >= %s" "$@";;
             "python_not_found_msg") translated_string="Python not found";;
             "confirm_install_python") translated_string="install Python3";;
-            "found_pip") printf -v translated_string "Found pip: %s" "$@";;
+            "found_pip") printf -v translated_string "找到 pip：%s" "$@";;
             "confirm_install_pip") translated_string="install pip";;
-            "found_git") printf -v translated_string "Found git: %s" "$@";;
+            "found_git") printf -v translated_string "找到 git：%s" "$@";;
             "confirm_install_git") translated_string="install git";;
             "path_no_python_scripts") translated_string="PATH does not contain Python Scripts";;
             "path_contains_local_bin") translated_string="PATH contains ~/.local/bin";;
@@ -293,7 +293,7 @@ translate() {
             "path_contains_root_local_bin") translated_string="PATH contains /root/.local/bin";;
             "path_no_root_local_bin") translated_string="PATH does not contain /root/.local/bin";;
             "fix_path_action") translated_string="fix PATH";;
-            "found_starsignal") printf -v translated_string "Found starsignal: %s" "$@";;
+            "found_starsignal") printf -v translated_string "找到 starsignal：%s" "$@";;
             "path_contains_python_scripts") translated_string="PATH contains Python Scripts";;
             "path_already_contains_local_bin") printf -v translated_string "PATH already contains ~/.local/bin in %s" "$@";;
             "prompt_press_enter") translated_string="Press Enter to continue...";;
@@ -515,9 +515,12 @@ install_python() {
             sudo apt-get install -y python3 python3-dev || die "$(translate "error" "Python 安装失败")"
             ;;
         centos|rhel)
+            sudo yum install -y epel-release || die "$(translate "error" "无法安装 EPEL 仓库")"
             sudo yum install -y centos-release-scl || die "$(translate "error" "无法安装 SCL 仓库")"
             sudo yum install -y rh-python39 rh-python39-python-devel || die "$(translate "error" "Python 3.9 安装失败")"
             PYTHON_CMD="/opt/rh/rh-python39/root/usr/bin/python3"
+            sudo sh -c "echo 'source /opt/rh/rh-python39/enable' >> /root/.bashrc"
+            source /opt/rh/rh-python39/enable
             ;;
         macos)
             if command_exists brew; then
@@ -575,6 +578,7 @@ upgrade_pip() {
     if check_python; then
         "$PYTHON_CMD" -m pip install --upgrade pip --user || die "$(translate "error" "pip 升级失败")"
         check_pip || die "$(translate "error" "pip 升级后仍不可用")"
+        PIP_CMD="pip3"
         log "$(translate "pip_install_success")"
     else
         die "$(translate "error" "需要 Python 以升级 pip")"
@@ -595,6 +599,7 @@ install_pip() {
             rm -f get-pip.py
         }
         check_pip || die "$(translate "error" "pip 安装失败")"
+        PIP_CMD="pip3"
         log "$(translate "pip_install_success")"
     else
         die "$(translate "error" "需要 Python 以安装 pip")"
@@ -608,7 +613,7 @@ check_git() {
         log "$(translate "found_git" "$GIT_VERSION")"
         MAJOR=$(echo "$GIT_VERSION" | cut -d. -f1)
         MINOR=$(echo "$GIT_VERSION" | cut -d. -f2)
-        if [ "$MAJOR" -lt 2 ] && [ "$MINOR" -lt 9 ]; then
+        if [ "$MAJOR" -lt 2 ] || { [ "$MAJOR" -eq 2 ] && [ "$MINOR" -lt 9 ]; }; then
             log "$(translate "dependency_status_outdated" "git" "$GIT_VERSION" "2.9+")"
             return 2
         fi
@@ -630,6 +635,8 @@ install_git() {
             sudo apt-get install -y git || die "$(translate "error" "git 安装失败")"
             ;;
         centos|rhel)
+            sudo yum install -y epel-release || die "$(translate "error" "无法安装 EPEL 仓库")"
+            sudo rpm -Uvh http://opensource.wandisco.com/centos/7/git/x86_64/wandisco-git-release-7-2.noarch.rpm || die "$(translate "error" "无法安装 Wandisco Git 仓库")"
             sudo yum install -y git || die "$(translate "error" "git 安装失败")"
             ;;
         macos)
@@ -739,7 +746,7 @@ fix_path() {
             log "$(translate "path_already_contains_local_bin" "$SHELL_CONFIG")"
         fi
         export PATH="${PATH_TO_ADD}:$PATH"
-        echo "$(translate "path_updated_reboot_linux_macos" "$SHELL_CONFIG")"
+        source "$SHELL_CONFIG" 2>/dev/null || log "$(translate "warning" "无法自动加载 $SHELL_CONFIG，请手动运行 'source $SHELL_CONFIG'")"
     fi
     check_path || die "$(translate "error" "无法验证 PATH 更新")"
 }
@@ -754,8 +761,9 @@ check_starsignal() {
         fi
         PIP_INFO=$("$PIP_CMD" show starsignal 2>/dev/null)
         if [ -n "$PIP_INFO" ]; then
-            INSTALLED_BRANCH=$(echo "$PIP_INFO" | grep -i "Location" | sed -n 's/.*@\([^#]*\).*#egg=starsignal/\1/p')
-            log "$(translate "installed_branch_source" "${INSTALLED_BRANCH:-未知}")"
+            INSTALLED_BRANCH=$(echo "$PIP_INFO" | grep -i "Location" | sed -n 's/.*@\([^#]*\).*/\1/p')
+            [ -z "$INSTALLED_BRANCH" ] && INSTALLED_BRANCH="未知"
+            log "$(translate "installed_branch_source" "$INSTALLED_BRANCH")"
         else
             INSTALLED_BRANCH="未知"
             log "$(translate "无法从 pip 提取分支信息")"
@@ -819,11 +827,11 @@ install_starsignal() {
     read -r confirm < /dev/tty
     [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && die "$(translate "install_cancelled")"
     show_progress "installing" "$BRANCH"
-    "$PIP_CMD" install --user --force-reinstall --no-warn-script-location "git+$REPO_URL@$BRANCH" 2>>"$LOG_FILE" || {
+    "$PIP_CMD" install --user --force-reinstall --no-warn-script-location "git+$REPO_URL@$BRANCH#egg=starsignal" 2>>"$LOG_FILE" || {
         echo "$(translate "error" "pip 安装失败，尝试使用 virtualenv")"
         "$PYTHON_CMD" -m venv starsignal_env
         . starsignal_env/bin/activate
-        pip install "git+$REPO_URL@$BRANCH" 2>>"$LOG_FILE" || die "$(translate "error" "安装失败")"
+        pip install "git+$REPO_URL@$BRANCH#egg=starsignal" 2>>"$LOG_FILE" || die "$(translate "error" "安装失败")"
     }
     "$PIP_CMD" install --user colorama 2>/dev/null || log "$(translate "warning_colorama_install_fail")"
     fix_permissions
@@ -858,7 +866,7 @@ update_starsignal() {
     read -r confirm < /dev/tty
     [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && die "$(translate "update_cancelled")"
     show_progress "updating" "$BRANCH"
-    "$PIP_CMD" install --user --force-reinstall --no-warn-script-location "git+$REPO_URL@$BRANCH" 2>>"$LOG_FILE" || die "$(translate "error" "更新失败")"
+    "$PIP_CMD" install --user --force-reinstall --no-warn-script-location "git+$REPO_URL@$BRANCH#egg=starsignal" 2>>"$LOG_FILE" || die "$(translate "error" "更新失败")"
     "$PIP_CMD" install --user colorama 2>/dev/null || log "$(translate "warning_colorama_update_fail")"
     fix_permissions
     if ! check_path; then
@@ -879,7 +887,7 @@ repair_starsignal() {
         upgrade_pip
     fi
     if check_starsignal; then
-        INSTALLED_BRANCH_INFO=$("$PIP_CMD" show starsignal 2>/dev/null | grep -i "Location" | sed -n 's/.*@\([^#]*\).*#egg=starsignal/\1/p')
+        INSTALLED_BRANCH_INFO=$("$PIP_CMD" show starsignal 2>/dev/null | grep -i "Location" | sed -n 's/.*@\([^#]*\).*/\1/p')
         BRANCH=${INSTALLED_BRANCH_INFO:-"main"}
         log "$(translate "detected_installed_branch" "${BRANCH}")"
     else
@@ -891,7 +899,7 @@ repair_starsignal() {
     read -r confirm < /dev/tty
     [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && die "$(translate "repair_cancelled")"
     show_progress "repairing"
-    "$PIP_CMD" install --user --force-reinstall --no-warn-script-location "git+$REPO_URL@$BRANCH" 2>>"$LOG_FILE" || die "$(translate "error" "修复失败")"
+    "$PIP_CMD" install --user --force-reinstall --no-warn-script-location "git+$REPO_URL@$BRANCH#egg=starsignal" 2>>"$LOG_FILE" || die "$(translate "error" "修复失败")"
     "$PIP_CMD" install --user colorama 2>/dev/null || log "$(translate "warning_colorama_install_fail")"
     fix_permissions
     if ! check_path; then
@@ -959,7 +967,10 @@ fix_environment() {
     echo "$(translate "env_dependencies_checking")"
     local all_dependencies_met=true
 
-    case $(check_python; echo $?) in
+    # 检查 Python
+    check_python
+    python_status=$?
+    case $python_status in
         0)
             echo "$(translate "dependency_status_found" "Python3" "$PYTHON_VERSION")"
             ;;
@@ -969,7 +980,8 @@ fix_environment() {
             read -r install_python_choice < /dev/tty
             if [ "$install_python_choice" = "y" ] || [ "$install_python_choice" = "Y" ]; then
                 install_python
-                if check_python; then
+                check_python
+                if [ $? -eq 0 ]; then
                     echo "$(translate "dependency_status_ok" "Python3")"
                 else
                     echo "$(translate "dependency_status_not_found" "Python3")"
@@ -986,7 +998,8 @@ fix_environment() {
             read -r upgrade_python_choice < /dev/tty
             if [ "$upgrade_python_choice" = "y" ] || [ "$upgrade_python_choice" = "Y" ]; then
                 install_python
-                if check_python; then
+                check_python
+                if [ $? -eq 0 ]; then
                     echo "$(translate "dependency_status_ok" "Python3")"
                 else
                     echo "$(translate "dependency_status_not_found" "Python3")"
@@ -998,7 +1011,10 @@ fix_environment() {
             ;;
     esac
 
-    case $(check_pip; echo $?) in
+    # 检查 pip
+    check_pip
+    pip_status=$?
+    case $pip_status in
         0)
             echo "$(translate "dependency_status_found" "pip3" "$PIP_VERSION")"
             ;;
@@ -1008,7 +1024,8 @@ fix_environment() {
             read -r install_pip_choice < /dev/tty
             if [ "$install_pip_choice" = "y" ] || [ "$install_pip_choice" = "Y" ]; then
                 install_pip
-                if check_pip; then
+                check_pip
+                if [ $? -eq 0 ]; then
                     echo "$(translate "dependency_status_ok" "pip3")"
                 else
                     echo "$(translate "dependency_status_not_found" "pip3")"
@@ -1025,7 +1042,8 @@ fix_environment() {
             read -r upgrade_pip_choice < /dev/tty
             if [ "$upgrade_pip_choice" = "y" ] || [ "$upgrade_pip_choice" = "Y" ]; then
                 upgrade_pip
-                if check_pip; then
+                check_pip
+                if [ $? -eq 0 ]; then
                     echo "$(translate "dependency_status_ok" "pip3")"
                 else
                     echo "$(translate "dependency_status_not_found" "pip3")"
@@ -1037,7 +1055,10 @@ fix_environment() {
             ;;
     esac
 
-    case $(check_git; echo $?) in
+    # 检查 git
+    check_git
+    git_status=$?
+    case $git_status in
         0)
             echo "$(translate "dependency_status_found" "git" "$GIT_VERSION")"
             ;;
@@ -1047,7 +1068,8 @@ fix_environment() {
             read -r install_git_choice < /dev/tty
             if [ "$install_git_choice" = "y" ] || [ "$install_git_choice" = "Y" ]; then
                 install_git
-                if check_git; then
+                check_git
+                if [ $? -eq 0 ]; then
                     echo "$(translate "dependency_status_ok" "git")"
                 else
                     echo "$(translate "dependency_status_not_found" "git")"
@@ -1064,7 +1086,8 @@ fix_environment() {
             read -r upgrade_git_choice < /dev/tty
             if [ "$upgrade_git_choice" = "y" ] || [ "$upgrade_git_choice" = "Y" ]; then
                 install_git
-                if check_git; then
+                check_git
+                if [ $? -eq 0 ]; then
                     echo "$(translate "dependency_status_ok" "git")"
                 else
                     echo "$(translate "dependency_status_not_found" "git")"
@@ -1076,6 +1099,7 @@ fix_environment() {
             ;;
     esac
 
+    # 检查 PATH
     if check_path; then
         echo "$(translate "dependency_status_ok" "PATH")"
     else
@@ -1089,10 +1113,13 @@ fix_environment() {
         fi
     fi
 
+    # 检查网络
     check_network
 
+    # 修复权限
     fix_permissions
 
+    # 总结
     echo "---------------------------------"
     echo "$(translate "dependency_check_summary")"
     if "$all_dependencies_met"; then
