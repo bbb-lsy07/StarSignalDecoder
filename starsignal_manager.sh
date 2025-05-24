@@ -1,6 +1,6 @@
 #!/bin/sh
 # 星际迷航：信号解码管理脚本
-# 版本：1.4.0
+# 版本：1.5.0
 # 作者：bbb-lsy07
 # 许可证：MIT
 # GitHub：https://github.com/bbb-lsy07/StarSignalDecoder
@@ -312,7 +312,7 @@ install_pip() {
         check_pip || die "$(translate "error" "pip 安装失败")"
         log "pip 安装成功"
     else
-        die "$(translate "error" "未 hindering Python，无法安装 pip")"
+        die "$(translate "error" "未找到 Python，无法安装 pip")"
     fi
 }
 
@@ -503,7 +503,7 @@ update_starsignal() {
 repair_starsignal() {
     log "正在修复 starsignal 安装..."
     if check_starsignal; then
-        INSTALLED_BRANCH=$($PIP_CMD show starsignal | grep -o "git+.*@.*" | cut -d@ -f2)
+        INSTALLED_BRANCH=$($PIP_CMD show starsignal | grep -o "git+.*@.*" | grep -o "@.*" | cut -d@ -f2)
         BRANCH=${INSTALLED_BRANCH:-"main"}
     else
         BRANCH="main"
