@@ -7,11 +7,13 @@ class SignalGenerator:
         self.rules = {
             "easy": ["ignore_symbols"],
             "medium": ["ignore_symbols", "reverse"],
-            "hard": ["ignore_symbols", "reverse"]
+            "hard": ["ignore_symbols", "reverse", "repeat", "odd_plus_one"]
         }
         self.rule_texts = {
             "ignore_symbols": "忽略所有非数字字符",
-            "reverse": "忽略非数字字符并反转序列"
+            "reverse": "忽略非数字字符并反转序列",
+            "repeat": "忽略非数字字符并将序列重复两次",
+            "odd_plus_one": "忽略非数字字符，奇数数字加1"
         }
 
     def generate_signal(self, num_options):
@@ -22,17 +24,22 @@ class SignalGenerator:
         signal = []
         for i in range(length):
             if random.random() < 0.3 and self.difficulty != "easy":
-                signal.append(symbols.pop(0))
+                signal.append(symbols.pop(0) if symbols else random.choice(string.punctuation))
             else:
                 signal.append(digits[i])
         
         rule = random.choice(self.rules[self.difficulty])
-        if rule == "ignore_symbols":
-            answer = ''.join(c for c in signal if c.isdigit())
-        else:  # reverse
-            answer = ''.join(c for c in signal if c.isdigit())[::-1]
+        digit_sequence = [c for c in signal if c.isdigit()]
         
-        # 生成干扰选项
+        if rule == "ignore_symbols":
+            answer = ''.join(digit_sequence)
+        elif rule == "reverse":
+            answer = ''.join(digit_sequence)[::-1]
+        elif rule == "repeat":
+            answer = ''.join(digit_sequence) * 2
+        else:  # odd_plus_one
+            answer = ''.join(str((int(c) + 1) % 10) if int(c) % 2 == 1 else c for c in digit_sequence)
+        
         distractors = []
         for _ in range(num_options - 1):
             distractor = ''.join(random.choices("0123456789", k=len(answer)))
@@ -40,4 +47,5 @@ class SignalGenerator:
                 distractor = ''.join(random.choices("0123456789", k=len(answer)))
             distractors.append(distractor)
         
-        return ''.join(signal), self.rule_texts[rule], answer, distractors
+        strength = random.randint(1, 3)
+        return ''.join(signal), self.rule_texts[rule], answer, distractors, strength

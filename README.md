@@ -2,38 +2,53 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3](https://img.shields.io/badge/Python-3-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-0.1.0-green.svg)](https://github.com/bbb-lsy07/StarSignalDecoder/releases)
+[![Version](https://img.shields.io/badge/Version-0.2.0-green.svg)](https://github.com/bbb-lsy07/StarSignalDecoder/releases)
 
-**星际迷航：信号解码** 是一款开源的终端解谜游戏，让你在黑漆漆的命令行中遨游星际！化身星际飞船信号官，通过选择正确的信号解码结果，修复导航系统，逃离危机四伏的星域。游戏融合科幻剧情、ASCII 艺术和紧张的时间挑战，每一关都让你心跳加速！
+**星际迷航：信号解码** 是一款开源的终端解谜游戏，带你化身星际飞船信号官，在命令行中挑战危机四伏的星域！通过解码随机信号，修复导航系统，收集能量核心逃离险境。游戏融合科幻剧情、彩色 ASCII 艺术、随机事件、技能系统和双人模式，每一局都让你心跳加速！
 
-**StarSignalDecoder** is an open-source terminal puzzle game that launches you into a sci-fi adventure! As a starship signal officer, select the correct decoded signal to repair the navigation system and escape a dangerous starfield. Packed with sci-fi storytelling, ASCII art, and thrilling time challenges, every round keeps you on the edge!
+**StarSignalDecoder** is an open-source terminal puzzle game where you play as a starship signal officer. Decode signals to repair the navigation system and escape a perilous starfield. With sci-fi storytelling, colorful ASCII art, random events, a skill system, and local co-op, every round is a thrilling adventure!
 
 ## 特色 (Features)
 
-- **简单上手**：多选题玩法，只需输入编号（如 <kbd>1</kbd>），新手也能秒玩。
-- **科幻剧情**：解码信号推动故事，收集 3 个能量核心赢得胜利。
-- **ASCII 艺术**：动态信号波形（如 <kbd>█</kbd>）和进度条（<kbd>[██▒] 2/3</kbd>），打造沉浸式体验。
-- **多难度模式**：
-  - 简单：60秒，3个选项
-  - 中等：45秒，4个选项
-  - 困难：30秒，5个选项
-- **跨平台**：仅需 Python 3，完美运行于 Linux、Windows、macOS。
-- **一键安装**：单命令快速部署，装完就能开玩！
+- **版本选择**：安装稳定版或开发版，体验最新功能。
+- **存档与记录**：保存游戏进度，记录最高分和通关次数。
+- **沉浸式剧情**：NPC 对话、随机事件（干扰、奖励）、多结局（英雄/幸存）。
+- **精致界面**：彩色输出（需 <kbd>colorama</kbd>）、动态波形、交互式提示（按 <kbd>H</kbd>）。
+- **创新玩法**：
+  - 信号强度（弱/中/强）影响难度和奖励。
+  - 技能系统：升级解码速度和能量恢复。
+  - 本地双人模式：轮流解码，合作逃离。
+- **易上手**：新手模式、强制教程（<kbd>--tutorial</kbd>）、玩法预览 GIF。
+- **跨平台**：仅需 Python 3，兼容 Linux、Windows、macOS。
+
+## 玩法预览 (Gameplay Preview)
+
+![Gameplay GIF](https://images.bbb-lsy07.my/starsignal_preview.gif)
+
+想知道怎么玩？看这个 GIF！解码信号，收集核心，体验星际冒险！
 
 ## 安装 (Installation)
 
-一条命令搞定安装 <span class="p cyan">星际迷航：信号解码</span>：
-
-```bash
-pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git
-```
+### 选择版本
+- **稳定版**（推荐，<kbd>main</kbd> 分支）：
+  ```bash
+  pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git@main
+  ```
+- **开发版**（最新功能，可能不稳定，<kbd>dev</kbd> 分支）：
+  ```bash
+  pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git@dev
+  ```
 
 **要求 (Requirements)**:
 - Python 3.6 或更高版本（运行 <kbd>python3 --version</kbd> 检查）。
-- 无外部依赖，安装即玩！
+- 可选：彩色输出需安装 <kbd>colorama</kbd>：
+  ```bash
+  pip3 install colorama
+  ```
+- 无其他依赖，安装即玩！
 
 **遇到问题 (Troubleshooting)?**  
-- **提示 `<kbd>pip: command not found</kbd>`**？先安装 `pip`：
+- **提示 <kbd>pip: command not found</kbd>**？先安装 `pip`：
   - **Ubuntu/Debian**：
     ```bash
     sudo apt update
@@ -47,11 +62,12 @@ pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git
     ```bash
     brew install python3
     ```
-- **提示 `<kbd>starsignal: command not found</kbd>`**？可能是脚本未加入 PATH：
+  - **Windows**：下载 Python 安装包，确保勾选“Add Python to PATH”。
+- **提示 <kbd>starsignal: command not found</kbd>**？脚本未加入 PATH：
   ```bash
   export PATH=$PATH:/root/.local/bin
   ```
-  想永久生效，添加到 <kbd>~/.bashrc</kbd>：
+  永久生效：
   ```bash
   echo 'export PATH=$PATH:/root/.local/bin' >> ~/.bashrc
   source ~/.bashrc
@@ -68,16 +84,24 @@ pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git
 
 **Install with one command**:
 
-```bash
-pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git
-```
+- **Stable (main branch)**:
+  ```bash
+  pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git@main
+  ```
+- **Development (dev branch)**:
+  ```bash
+  pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git@dev
+  ```
 
 **Requirements**:
-- Python 3.6 or higher (check with <kbd>python3 --version</kbd>).
-- No external dependencies—install and play!
+- Python 3.6+ (check with <kbd>python3 --version</kbd>).
+- Optional: Install <kbd>colorama</kbd> for colored output:
+  ```bash
+  pip3 install colorama
+  ```
 
 **Troubleshooting**:
-- **See `<kbd>pip: command not found</kbd>`**? Install `pip`:
+- **See <kbd>pip: command not found</kbd>**? Install `pip`:
   - **Ubuntu/Debian**:
     ```bash
     sudo apt update
@@ -91,11 +115,12 @@ pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git
     ```bash
     brew install python3
     ```
-- **See `<kbd>starsignal: command not found</kbd>`**? Ensure pip-installed scripts are in PATH:
+  - **Windows**: Ensure Python is installed with PATH enabled.
+- **See <kbd>starsignal: command not found</kbd>**? Add scripts to PATH:
   ```bash
   export PATH=$PATH:/root/.local/bin
   ```
-  Persist by adding to <kbd>~/.bashrc</kbd>:
+  Persist:
   ```bash
   echo 'export PATH=$PATH:/root/.local/bin' >> ~/.bashrc
   source ~/.bashrc
@@ -103,11 +128,6 @@ pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git
 - **Network issues**? Verify GitHub access (<kbd>ping github.com</kbd>). If failing, update DNS:
   ```bash
   echo "nameserver 8.8.8.8" >> /etc/resolv.conf
-  ```
-  Or set a proxy:
-  ```bash
-  export http_proxy=http://your-proxy:port
-  export https_proxy=http://your-proxy:port
   ```
 
 ## 使用 (Usage)
@@ -121,18 +141,20 @@ starsignal
 ### 命令选项 (Command Options)
 
 - `--difficulty {easy,medium,hard}`：选择难度（默认：<kbd>easy</kbd>）
-  - <kbd>easy</kbd>：60秒，3个选项
-  - <kbd>medium</kbd>：45秒，4个选项
-  - <kbd>hard</kbd>：30秒，5个选项
+  - <kbd>easy</kbd>：60秒，3选项，新手友好
+  - <kbd>medium</kbd>：45秒，4选项，适中挑战
+  - <kbd>hard</kbd>：30秒，5选项，高手专属
+- `--tutorial`：强制显示教程，适合新手
+- `--load FILE`：加载存档（例如：<kbd>save.json</kbd>）
 - `--version`：显示当前版本号
 - `--help`：查看帮助信息
 
 ### 示例 (Example)
 
-运行中等难度：
+运行中等难度并加载存档：
 
 ```bash
-starsignal --difficulty medium
+starsignal --difficulty medium --load save.json
 ```
 
 输出示例：
@@ -142,41 +164,56 @@ starsignal --difficulty medium
 ║    星际迷航：信号解码              ║
 ╚══════════════════════════════════════╝
 欢迎，信号官！你的飞船被困在危险星域！
-...
-接收到新信号：
+
+接收到新信号（强度：中）：
   █       █  
     █   █   
 █   █   █   █
 信号：3#5*2
-规则：忽略非数字字符并反转序列
+规则：忽略所有非数字字符
 1. 253
 2. 523
 3. 532
 4. 235
 飞船能量：100% | 得分：0 | 能量核心：0
 任务进度：[▒] 0/3
-请输入正确选项编号（1-4）：2
+NPC: '保持冷静，我们一定能逃出去！'
+请输入选项编号（1-4）、's' 保存、'h' 提示、'q' 退出：2
 信号解码成功！飞船前进！
 故事进展：飞船检测到微弱信号，导航系统开始响应！
 ```
 
 ## 玩法说明 (How to Play)
 
-1. **启动游戏**：运行 <kbd>starsignal</kbd>，首次进入有简易教程。
-2. **解码信号**：根据信号（如 <kbd>3#5*2</kbd>）和规则（如“忽略非数字字符”），从选项中选正确答案（输入编号，如 <kbd>1</kbd>）。
-3. **目标**：在时间限制内解码信号，收集 3 个能量核心逃离星域。
-4. **注意**：答错或超时会减少飞船能量，能量耗尽游戏结束。
+1. **启动游戏**：运行 <kbd>starsignal</kbd>，首次进入显示教程（或用 <kbd>--tutorial</kbd>）。
+2. **解码信号**：根据信号（如 <kbd>3#5*2</kbd>）和规则（如“忽略非数字字符”），输入选项编号（如 <kbd>1</kbd>）。
+3. **目标**：在时间限制内收集 3 个能量核心逃离星域。
+4. **操作**：
+   - <kbd>s</kbd>：保存进度（生成 JSON 文件）。
+   - <kbd>h</kbd>：显示提示（规则说明）。
+   - <kbd>q</kbd>：退出游戏。
+5. **注意**：
+   - 答错或超时减能量，能量 ≤ 0 游戏结束。
+   - 信号强度（弱/中/强）影响难度和奖励。
+   - 随机事件（干扰、故障、奖励）增加挑战。
+6. **双人模式**：启动时选择，玩家轮流解码，共享飞船状态。
+
+## 存档与记录 (Save & Records)
+
+- **存档**：游戏中输入 <kbd>s</kbd>，保存进度到指定 JSON 文件（默认：<kbd>save.json</kbd>）。
+- **加载**：用 <kbd>--load save.json</kbd> 恢复进度。
+- **记录**：最高分和通关次数保存在 <kbd>~/.starsignal_data.json</kbd>，每次游戏更新。
 
 ## 卸载 (Uninstallation)
 
-想卸载 <span class="p cyan">StarSignalDecoder</span>？运行：
+卸载 <span class="p cyan">StarSignalDecoder</span>：
 
 ```bash
 pip3 uninstall starsignal
 ```
 
 - 输入 <kbd>y</kbd> 确认。
-- 验证卸载：运行 <kbd>pip3 show starsignal</kbd>，应无输出。
+- 验证：<kbd>pip3 show starsignal</kbd> 无输出。
 
 **Uninstall**:
 
@@ -185,31 +222,39 @@ pip3 uninstall starsignal
 ```
 
 - Confirm with <kbd>y</kbd>.
-- Verify: Run <kbd>pip3 show starsignal</kbd>, should show no output.
+- Verify: <kbd>pip3 show starsignal</kbd> should show no output.
 
 ## 更新 (Updating)
 
-想体验最新功能？强制重新安装 GitHub 仓库最新代码：
+获取最新版本（稳定版）：
 
 ```bash
-pip3 install --force-reinstall git+https://github.com/bbb-lsy07/StarSignalDecoder.git
+pip3 install --force-reinstall git+https://github.com/bbb-lsy07/StarSignalDecoder.git@main
 ```
 
-- 检查版本：<kbd>pip3 show starsignal</kbd>（版本号取决于 <kbd>setup.py</kbd>）。
-- 测试更新：<kbd>starsignal --difficulty easy</kbd>。
+- 开发版：
+  ```bash
+  pip3 install --force-reinstall git+https://github.com/bbb-lsy07/StarSignalDecoder.git@dev
+  ```
+- 检查：<kbd>pip3 show starsignal</kbd>。
+- 测试：<kbd>starsignal --difficulty easy</kbd>。
 
 **Update**:
 
 ```bash
-pip3 install --force-reinstall git+https://github.com/bbb-lsy07/StarSignalDecoder.git
+pip3 install --force-reinstall git+https://github.com/bbb-lsy07/StarSignalDecoder.git@main
 ```
 
-- Check version: <kbd>pip3 show starsignal</kbd> (version depends on <kbd>setup.py</kbd>).
-- Test update: <kbd>starsignal --difficulty easy</kbd>.
+- Development branch:
+  ```bash
+  pip3 install --force-reinstall git+https://github.com/bbb-lsy07/StarSignalDecoder.git@dev
+  ```
+- Check: <kbd>pip3 show starsignal</kbd>.
+- Test: <kbd>starsignal --difficulty easy</kbd>.
 
 ## 开发 (Development)
 
-想加点料或本地开发？按以下步骤：
+想加点新玩法？按以下步骤：
 
 1. **克隆仓库**：
    ```bash
@@ -228,40 +273,40 @@ pip3 install --force-reinstall git+https://github.com/bbb-lsy07/StarSignalDecode
    ```
 
 **贡献指南 (Contributing)**:
-- 在 [Issues](https://github.com/bbb-lsy07/StarSignalDecoder/issues) 提交问题或建议。
+- 在 [Issues](https://github.com/bbb-lsy07/StarSignalDecoder/issues) 提建议或问题。
 - Fork 仓库，提交 Pull Request，欢迎新规则、剧情或功能！
 - 推荐改进：
-  - 彩色输出：用 <kbd>colorama</kbd> 让信号波形更炫。
-  - 新规则：如“奇数加1”或“字母转数字”。
-  - 排行榜：记录玩家最高分。
+  - 新规则：如“数字平方”或“替换字符”。
+  - 多人在线模式：通过 WebSocket 联网对战。
+  - 终端音效：用 <kbd>beep</kbd> 模拟信号声。
 
 ## 常见问题 (FAQ)
 
 **Q: 为什么运行 <kbd>starsignal</kbd> 提示 <kbd>command not found</kbd>？**  
-A: 可能是安装路径未加入 PATH。检查：
+A: 检查：
 - Python 版本：<kbd>python3 --version</kbd>（需 3.6+）。
 - 安装状态：<kbd>pip3 show starsignal</kbd>。
-- 修复 PATH：<kbd>export PATH=$PATH:/root/.local/bin</kbd>。
-- 重新安装：<kbd>pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git</kbd>。
+- PATH：<kbd>export PATH=$PATH:/root/.local/bin</kbd>。
+- 重新安装：<kbd>pip3 install git+https://github.com/bbb-lsy07/StarSignalDecoder.git@main</kbd>。
 
 **Q: 遇到 <kbd>pip: command not found</kbd> 怎么办？**  
-A: 安装 `pip`（以 Ubuntu/Debian 为例）：
+A: 安装 `pip`：
 ```bash
 sudo apt update
 sudo apt install python3-pip -y
 ```
 
-**Q: 如何确认游戏更新到最新版？**  
-A: 运行 <kbd>pip3 show starsignal</kbd> 检查版本号，或体验游戏内新功能（如新规则）。若版本号未变，仓库代码可能已更新但 <kbd>setup.py</kbd> 未改。
-
 **Q: 游戏卡顿或崩溃怎么办？**  
-A: 确保终端支持 UTF-8 编码（Linux 默认支持）。若有问题，请在 [Issues](https://github.com/bbb-lsy07/StarSignalDecoder/issues) 提交日志。
+A: 确保终端支持 UTF-8（Linux 默认支持）。若问题持续，提交 [Issues](https://github.com/bbb-lsy07/StarSignalDecoder/issues)。
+
+**Q: 如何保存和加载进度？**  
+A: 游戏中按 <kbd>s</kbd> 保存，启动时用 <kbd>--load save.json</kbd> 加载。
 
 **Q: 可以加什么新功能？**  
-A: 欢迎创意！比如：
-- 新规则：如“奇数加1”或“字母转数字”。
-- 彩色波形：用 <kbd>colorama</kbd> 增强视觉。
-- 排行榜：记录玩家得分。
+A: 欢迎创意！如：
+- 动态天气：影响信号强度。
+- 装备系统：解锁解码工具。
+- 剧情分支：根据选择改变结局。
 
 ## 许可证 (License)
 
@@ -276,5 +321,5 @@ This project is licensed under the [MIT License](LICENSE), free to use, modify, 
 - **GitHub**：https://github.com/bbb-lsy07
 - **博客**：https://i.bbb-lsy07.sbs/
 
-感谢体验 <span class="p cyan">星际迷航：信号解码</span>！快来解码信号，开启你的星际冒险吧！  
+感谢体验 <span class="p cyan">星际迷航：信号解码</span>！快来解码信号，开启星际冒险吧！  
 Thank you for trying <span class="p cyan">StarSignalDecoder</span>! Decode signals and embark on your interstellar adventure!
