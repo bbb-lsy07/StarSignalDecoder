@@ -12,16 +12,16 @@ class StarSignalGame:
         self.practice = practice
         self.endless = False
         self.settings = {
-            "easy": {"time_limit": 60, "options": 3, "energy_loss": 10, "signal_length": 5},
-            "medium": {"time_limit": 45, "options": 4, "energy_loss": 15, "signal_length": 7},
-            "hard": {"time_limit": 30, "options": 5, "energy_loss": 20, "signal_length": 10},
-            "challenge": {"time_limit": 40, "options": 4, "energy_loss": 15, "signal_length": 8}
+            "easy": {"time_limit": 60, "options": 3, "energy_loss": 5, "signal_length": 5},
+            "medium": {"time_limit": 45, "options": 4, "energy_loss": 10, "signal_length": 7},
+            "hard": {"time_limit": 30, "options": 5, "energy_loss": 15, "signal_length": 10},
+            "challenge": {"time_limit": 40, "options": 4, "energy_loss": 10, "signal_length": 8}
         }
         self.time_limit = self.settings[difficulty]["time_limit"]
         self.num_options = self.settings[difficulty]["options"]
         self.energy_loss = self.settings[difficulty]["energy_loss"]
         self.base_signal_length = self.settings[difficulty]["signal_length"]
-        self.energy = 100
+        self.energy = 100.0
         self.score = 0
         self.cores = 0
         self.level = 1
@@ -37,6 +37,8 @@ class StarSignalGame:
         self.unlocked_levels = [1]
         self.current_task = None
         self.task_progress = 0
+        self.players = 1
+        self.current_player = 1
         self.load_records()
         if load_slot:
             self.load_game(load_slot)
@@ -79,7 +81,7 @@ class StarSignalGame:
     def save_records(self):
         data = {
             "high_score": max(self.score, self.high_score),
-            "total_wins": self.total_wins + (1 if self.level > 3 and self.energy == 100 else 0),
+            "total_wins": self.total_wins + (1 if self.level > 3 and self.energy == 100.0 else 0),
             "achievements": list(self.achievements),
             "equipment": self.equipment,
             "items": self.items,
@@ -96,6 +98,7 @@ class StarSignalGame:
         }
         with open(self.data_file, 'w') as f:
             json.dump(data, f, indent=2)
+        os.chmod(self.data_file, 0o666)
 
     def load_game(self, slot):
         save_file = os.path.expanduser(f"~/.starsignal_save_{slot}.json")
@@ -111,6 +114,7 @@ class StarSignalGame:
                 self.items = data.get("items", [])
                 self.current_task = data.get("current_task", None)
                 self.task_progress = data.get("task_progress", 0)
+                self.players = data.get("players", 1)
             print(f"存档槽位 {slot} 加载成功！")
         except (FileNotFoundError, json.JSONDecodeError):
             print(f"无法加载槽位 {slot}，从新游戏开始。")
@@ -127,12 +131,13 @@ class StarSignalGame:
             "equipment": self.equipment,
             "items": self.items,
             "current_task": self.current_task,
-            "task_progress": self.task_progress
+            "task_progress": self.task_progress,
+            "players": self.players
         }
         with open(save_file, 'w') as f:
             json.dump(data, f, indent=2)
         os.chmod(save_file, 0o666)
-        print(f"游戏保存至槽位 {slot}（{save_file}）！")
+        print(f"游戏保存至槽位 {slot}！")
 
     def unlock_achievement(self, name):
         if name not in self.achievements:
@@ -183,7 +188,7 @@ class StarSignalGame:
             return True
         elif choice == "能量电池" and "能量电池" in self.items:
             self.items.remove("能量电池")
-            self.energy = min(self.energy + 20, 100)
+            self.energy = min(self.energy + 20.0, 100.0)
             print("使用能量电池，能量 +20%！")
             return False
         else:
@@ -216,7 +221,7 @@ class StarSignalGame:
             if "分" in reward:
                 self.score += int(reward.split()[0])
             elif "能量" in reward:
-                self.energy = min(self.energy + int(reward.split()[1]), 100)
+                self.energy = min(self.energy + int(reward.split()[1]), 100.0)
             self.current_task = None
             self.task_progress = 0
 
@@ -231,7 +236,7 @@ class StarSignalGame:
 
         if mode == "1":
             self.level = 1
-            self.energy = 100
+            self.energy = 100.0
             self.score = 0
             self.cores = 0
             self.equipment = None
@@ -245,7 +250,7 @@ class StarSignalGame:
             level = input("选择关卡（输入编号）：").strip()
             if level.isdigit() and int(level) in self.unlocked_levels:
                 self.level = int(level)
-                self.energy = 100
+                self.energy = 100.0
                 self.score = 0
                 self.cores = 0
                 self.equipment = None
@@ -256,7 +261,7 @@ class StarSignalGame:
         elif mode == "4" and self.total_wins > 0:
             self.endless = True
             self.level = 1
-            self.energy = 100
+            self.energy = 100.0
             self.score = 0
             self.cores = 0
             self.equipment = None
@@ -265,19 +270,15 @@ class StarSignalGame:
             print("无效选择，从关卡 1 开始！")
             self.level = 1
 
-        players = 1
-        play_style = input("玩法：1) 单人 2) 双人 3) 冒险模式 [1]：").strip() or "1"
+        play_style = input("玩法：1) 单人 2) 双人 [1]：").strip() or "1"
         if play_style == "2":
-            players = 2
+            self.players = 2
             print("双人模式启动！连续正确触发连携加成！")
             self.unlock_achievement("双人冒险者")
-        elif play_style == "3":
-            self.adventure_mode = True
-            print("冒险模式启动！选择影响剧情！")
         else:
-            self.adventure_mode = False
+            self.players = 1
 
-        core_targets = [1, 2, 3]  # 每关核心数
+        core_targets = [1, 2, 3]
         max_level = 3 if not self.endless else float("inf")
 
         while self.level <= max_level and self.energy > 0:
@@ -290,9 +291,15 @@ class StarSignalGame:
             is_boss = False
             signals_decoded = 0
             max_signals = 5 if self.level < 3 else 7
+            energy_recovery_mode = False
 
-            while self.cores < core_target and self.energy > 0:
-                if signals_decoded >= max_signals and not is_boss:
+            while (self.cores < core_target or (self.cores >= core_target and self.energy < 100.0)) and self.energy > 0:
+                if self.cores >= core_target and not energy_recovery_mode:
+                    energy_recovery_mode = True
+                    print(self.color_text("核心收集完成！需恢复能量至 100.0%！", Fore.YELLOW))
+                    self.display.show_story(4)
+
+                if signals_decoded >= max_signals and not is_boss and not energy_recovery_mode:
                     is_boss = True
                     self.display.show_boss()
 
@@ -317,17 +324,17 @@ class StarSignalGame:
                 if event == "interference":
                     adjusted_time_limit = max(10, adjusted_time_limit - 10)
                 elif event == "fault":
-                    self.energy -= adjusted_energy_loss // 2
+                    self.energy -= adjusted_energy_loss / 2
                 elif event == "bonus":
                     self.score += 5 * strength
                 elif event == "storm":
                     effect = random.choice(["energy_loss", "energy_gain"])
                     if effect == "energy_loss":
-                        self.energy -= 10
-                        print("能量风暴！能量 -10！")
+                        self.energy -= 10.0
+                        print("能量风暴！能量 -10%！")
                     else:
-                        self.energy = min(self.energy + 10, 100)
-                        print("能量风暴！能量 +10！")
+                        self.energy = min(self.energy + 10.0, 100.0)
+                        print("能量风暴！能量 +10%！")
                 elif event == "merchant":
                     item = self.purchase_item(self.get_available_items())
                     if item:
@@ -344,9 +351,12 @@ class StarSignalGame:
                     elif self.equipment == "快速解码器":
                         self.skills["decode_speed"] += 0.3
 
+                if self.players > 1:
+                    print(self.color_text(f"\n玩家 {self.current_player} 的回合", Fore.CYAN))
+
                 self.display.show_signal(
                     signal, rule, options, self.energy, self.score, self.cores,
-                    core_target, self.level, strength, weather, self.equipment, self.items, self.current_task
+                    core_target, self.level, strength, weather, self.equipment, self.items, self.current_task, energy_recovery_mode
                 )
                 
                 start_time = time.time()
@@ -379,23 +389,30 @@ class StarSignalGame:
                     if elapsed_time > adjusted_time_limit:
                         print("时间到！信号丢失！")
                         if not self.practice:
-                            self.energy -= adjusted_energy_loss // strength
+                            self.energy -= adjusted_energy_loss * strength
                         self.consecutive_correct = 0
                     elif 0 <= choice < self.num_options and options[choice] == answer:
                         print("解码成功！飞船前进！")
                         correct = True
-                        self.score += (10 * strength + (20 if is_boss else 0))
-                        self.energy = min(self.energy + 5 * self.skills["energy_recovery"], 100)
-                        self.cores += 1
+                        energy_gain = [10.0, 12.0, 15.0][strength - 1] * self.skills["energy_recovery"]
+                        score_gain = (10 * strength + (30 if is_boss else 0))
+                        if energy_recovery_mode:
+                            energy_gain *= 1.5  # 恢复阶段能量奖励增加
+                            score_gain //= 2  # 减少得分
+                        self.score += score_gain
+                        self.energy = min(self.energy + energy_gain, 100.0)
+                        if not energy_recovery_mode:
+                            self.cores += 1
                         self.consecutive_correct += 1
                         if self.consecutive_correct >= 3:
                             self.unlock_achievement("快速解码者")
                         if is_boss:
                             self.unlock_achievement("Boss 终结者")
-                        if players > 1 and self.consecutive_correct % 2 == 0:
+                        if self.players > 1 and self.consecutive_correct >= 2:
                             self.score += 10
-                            self.energy = min(self.energy + 5, 100)
+                            self.energy = min(self.energy + 5.0, 100.0)
                             print("连携加成！+10 分，+5% 能量！")
+                            self.unlock_achievement("连携大师")
                         if random.random() < 0.3:
                             self.upgrade_skill()
                     else:
@@ -404,37 +421,28 @@ class StarSignalGame:
                             self.energy -= adjusted_energy_loss * strength
                         self.consecutive_correct = 0
                 except (ValueError, IndexError):
-                    print("无效输入！")
+                    print("无效输入！请输入正确选项编号。")
                     if not self.practice:
-                        self.energy -= adjusted_energy_loss // 2
+                        self.energy -= 5.0
                     self.consecutive_correct = 0
 
                 self.check_task_progress(strength, correct)
                 self.display.show_status(self.energy, self.score, self.cores, self.level)
-                if self.energy <= 0 or (self.cores >= core_target and not self.endless):
+                if self.energy <= 0:
                     break
 
-                if self.adventure_mode and random.random() < 0.3:
-                    choice = input("未知信号！1) 冒险探索 2) 保守绕行 [1]：").strip() or "1"
-                    if choice == "1":
-                        self.score += 10
-                        print("探索成功！发现能量！")
-                    else:
-                        self.energy -= 5
-                        print("绕行耗费能量，避开风险。")
+                if self.players > 1:
+                    self.current_player = 2 if self.current_player == 1 else 1
 
             if self.energy <= 0:
                 print("游戏结束！飞船能量耗尽！")
                 break
-            if self.cores >= core_target:
-                self.display.show_story(self.level)
+            if self.cores >= core_target and self.energy == 100.0:
+                self.display.show_story(self.cores)
                 if self.level == 3 and not self.endless:
-                    if self.energy < 100:
-                        print("能量未达 100%，无法通关！")
-                        break
-                    self.unlock_achievement("星域征服者")
                     if self.score > 100:
                         self.unlock_achievement("完美通关")
+                    self.unlock_achievement("星域征服者")
                 self.unlocked_levels = list(set(self.unlocked_levels + [self.level + 1]))
                 self.level += 1
                 if self.level <= 3 and not self.endless:
@@ -444,8 +452,11 @@ class StarSignalGame:
                             self.time_limit += item["time_limit"]
                         elif "energy_loss" in item:
                             self.energy_loss = max(5, self.energy_loss + item["energy_loss"])
-                    self.energy = min(self.energy + 10, 100)
-                    print("关卡奖励：能量 +10！")
+                    self.energy = min(self.energy + 10.0, 100.0)
+                    print("关卡奖励：能量 +10%！")
+                if self.endless:
+                    self.base_signal_length += 1
+                    self.num_options = min(self.num_options + 1, 6)
 
         self.display.show_ending(self.score, self.cores, self.level - 1, self.energy)
         self.save_records()
