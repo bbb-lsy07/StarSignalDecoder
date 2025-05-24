@@ -14,12 +14,16 @@ def main():
         help="显示版本号并退出"
     )
     parser.add_argument(
-        "--difficulty", choices=["easy", "medium", "hard"], default="easy",
-        help="设置游戏难度：\n  easy（简单：60秒，3选项）\n  medium（中等：45秒，4选项）\n  hard（困难：30秒，5选项）（默认：easy）"
+        "--difficulty", choices=["easy", "medium", "hard", "challenge"], default="easy",
+        help="设置游戏难度：\n  easy（简单：60秒，3选项）\n  medium（中等：45秒，4选项）\n  hard（困难：30秒，5选项）\n  challenge（挑战：随机规则）（默认：easy）"
     )
     parser.add_argument(
         "--tutorial", action="store_true",
         help="强制显示教程，适合新手"
+    )
+    parser.add_argument(
+        "--practice", action="store_true",
+        help="进入练习模式，无能量惩罚"
     )
     parser.add_argument(
         "--load", type=str,
@@ -27,7 +31,7 @@ def main():
     )
     args = parser.parse_args()
 
-    game = StarSignalGame(difficulty=args.difficulty, load_file=args.load)
+    game = StarSignalGame(difficulty=args.difficulty, load_file=args.load, practice=args.practice)
     if args.tutorial or game.is_first_time():
         game.display.show_tutorial()
     game.start()
