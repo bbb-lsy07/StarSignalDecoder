@@ -2,30 +2,33 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3](https://img.shields.io/badge/Python-3-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-0.6.0-green.svg)](https://github.com/bbb-lsy07/StarSignalDecoder/releases)
+[![Version](https://img.shields.io/badge/Version-0.7.0-green.svg)](https://github.com/bbb-lsy07/StarSignalDecoder/releases)
 
-**星际迷航：信号解码** 是一款开源终端解谜游戏，化身星际信号官，挑战未知星域！通过 3 个关卡，解码信号，击败 Boss，收集核心，最终能量 100% 逃离危机。融合科幻剧情、彩色 ASCII 艺术、关卡选择、道具解锁、无尽模式和排行榜，带来沉浸冒险！
+**星际迷航：信号解码** 是一款开源终端解谜游戏，化身星际信号官，挑战未知星域！通过 3 个关卡，解码信号，击败 Boss，收集核心，最终能量 100.0% 逃离危机。融合科幻剧情、美观 ASCII 界面、关卡选择、道具解锁、无尽模式和排行榜，带来沉浸冒险！
 
-**StarSignalDecoder** is an open-source terminal puzzle game. As a starship signal officer, conquer 3 levels, decode signals, defeat Bosses, and escape a perilous starfield with 100% energy, featuring sci-fi storytelling, colorful ASCII art, level selection, unlockable items, endless mode, and leaderboards!
+**StarSignalDecoder** is an open-source terminal puzzle game. As a starship signal officer, conquer 3 levels, decode signals, defeat Bosses, and escape a perilous starfield with 100.0% energy, featuring sci-fi storytelling, elegant ASCII interfaces, level selection, unlockable items, endless mode, and leaderboards!
 
 ## 特色 (Features)
 
 - **版本选择**：稳定版（`main`）或开发版（`dev`）。
-- **关卡挑战**：3 个关卡，难度递增，Boss 信号，每关核心目标（1/2/3）。
+- **关卡挑战**：3 个关卡，难度递增，Boss 信号，每关核心目标（1/2/3），能量 100.0% 通关。
 - **存档与成就**：3 槽位存档，解锁成就（“完美通关”），排行榜前 5。
-- **沉浸剧情**：NPC 任务、随机事件（风暴、商人）、多结局。
-- **精致界面**：彩色输出（需 <kbd>colorama</kbd>）、动态波形、能量警告。
+- **沉浸剧情**：NPC 任务、随机事件（风暴、商人）、多结局（星际传奇、险象环生、信号失联）。
+- **美观界面**：
+  - 动态波形：匹配信号长度，强度影响闪烁。
+  - 能量警告：红色（<30%）、黄色（<80%）、绿色（≥80%）。
+  - 动画：关卡切换、Boss 出现、商店开启。
 - **创新玩法**：
   - **关卡选择**：解锁后直达关卡。
   - **道具解锁**：能量电池、干扰器。
-  - **动态天气**：风暴、迷雾影响难度。
-  - **无尽模式**：通关解锁，挑战极限。
+  - **动态天气**：风暴（-20% 时间）、迷雾（+1 选项）。
+  - **无尽模式**：通关解锁，信号长度递增。
   - **双人协作**：连携加成（+10 分，+5% 能量）。
-- **易上手**：练习模式、交互教程、玩法预览 GIF。
+- **易上手**：练习模式、交互教程（支持 `skip`）、玩法预览 GIF。
 
 ## 玩法预览 (Gameplay Preview)
 
-![Gameplay GIF](https://images.bbb-lsy07.my/starsignal_preview.gif)
+![Gameplay GIF](https://images.bbb-lsy07.my/starsignal_preview_v07.gif)
 
 解码信号，挑战 Boss，解锁无尽模式！看 GIF 秒懂！
 
@@ -80,54 +83,52 @@ starsignal
 
 ### 命令选项
 - `--difficulty {easy,medium,hard,challenge}`：难度（`challenge` 随机规则）。
-- `--tutorial`：教程。
+- `--tutorial`：教程（支持 `skip`）。
 - `--practice`：练习模式（无惩罚）。
-- `--load SLOT`：加载存档（1-3）。
+- `--load {1,2,3}`：加载存档槽位。
 - `--version`：版本。
 - `--help`：帮助。
 
 ### 示例
 
 ```bash
-starsignal --difficulty challenge
+starsignal --difficulty challenge --practice
 ```
 
 输出：
 
 ```
-╔══════════════════════════════════════╗
-║    星际迷航：信号解码              ║
-╚══════════════════════════════════════╝
-选择模式：
+╔══════ 模式选择 ══════╗
 1) 新游戏（关卡 1）
 2) 继续（关卡 2）
 3) 选择关卡（已解锁：1,2）
 4) 无尽模式（已解锁）
+╚═══════════════════════╝
 请输入（1-4）：1
-关卡 1 | 天气：晴朗 | 装备：无
-NPC任务：连续解码 3 次强信号！
+╔══════ 关卡 1 | 晴朗 | 装备：无 | 道具：无 ══════╗
+NPC任务：无
 信号（强度：弱）：
-  █   █   █  
-█ █ █ █ █ █ 
+  █ ▒ █
 信号：3#5*2
 规则：忽略非数字字符
-1. 352
-2. 35
-3. 53
-能量：100% | 得分：0 | 核心：0/1
-请输入（1-3，s 保存，h 提示，q 退出）：1
+1. 352  2. 35  3. 53
+能量：100.0% | 得分：0 | 核心：0/1
+进度：[▒] 0/1
+╚═══════════════════════════════════════════════╝
+请输入（1-3，s 保存，h 提示，i 使用道具，q 退出）：1
 解码成功！核心 +1！
 ```
 
 ## 玩法说明 (How to Play)
 
 1. **启动**：运行 <kbd>starsignal</kbd>，选择模式（新游戏/继续/关卡/无尽）。
-2. **关卡**：通过 3 关，每关收集核心（1/2/3），击败 Boss，保持能量 100%。
+2. **关卡**：通过 3 关，每关收集核心（1/2/3），击败 Boss，恢复能量至 100.0%。
 3. **解码**：根据信号和规则，选择正确选项（<kbd>1</kbd>）。
-4. **目标**：完成 3 关，能量 100%，达成高分。
+4. **目标**：完成 3 关，能量 100.0%，达成高分。
 5. **操作**：
    - <kbd>s</kbd>：保存（槽位 1-3）。
    - <kbd>h</kbd>：提示。
+   - <kbd>i</kbd>：使用道具。
    - <kbd>q</kbd>：退出。
 6. **特色**：
    - **关卡选择**：解锁后直达关卡。
