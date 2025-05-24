@@ -1,6 +1,6 @@
 #!/bin/sh
 # 星际迷航：信号解码管理脚本
-# 版本：1.3.0
+# 版本：1.4.0
 # 作者：bbb-lsy07
 # 许可证：MIT
 # GitHub：https://github.com/bbb-lsy07/StarSignalDecoder
@@ -16,7 +16,7 @@ REPO_URL="https://github.com/bbb-lsy07/StarSignalDecoder.git"
 DEFAULT_BRANCH="main"
 PYTHON_MIN_VERSION="3.6"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-LANG_MODE="zh"  # 默认中文
+LANG_MODE="zh"
 MAX_RETRIES=3
 RETRY_DELAY=5
 
@@ -42,7 +42,7 @@ translate() {
     key="$1"
     if [ "$LANG_MODE" = "zh" ]; then
         case "$key" in
-            "welcome") echo "星际迷航：信号解码管理器 v1.3.0";;
+            "welcome") echo "星际迷航：信号解码管理器 v1.4.0";;
             "status_installed") echo "状态：已安装（版本：%s，分支：%s）";;
             "status_not_installed") echo "状态：未安装";;
             "save_files_present") echo "存档文件：存在";;
@@ -80,7 +80,7 @@ translate() {
         esac
     else
         case "$key" in
-            "welcome") echo "StarSignalDecoder Manager v1.3.0";;
+            "welcome") echo "StarSignalDecoder Manager v1.4.0";;
             "status_installed") echo "Status: Installed (Version: %s, Branch: %s)";;
             "status_not_installed") echo "Status: Not installed";;
             "save_files_present") echo "Save files: Present";;
@@ -437,23 +437,18 @@ check_starsignal() {
 # 检查存档文件
 check_saves() {
     if [ "$OS" = "windows" ]; then
-        ls "$HOME/.starsignal"* >/dev/null 2>&1 || powershell -Command "Get-ChildItem -Path $env:USERPROFILE\.starsignal* -ErrorAction SilentlyContinue" >/dev/null 2>&1
+        powershell -Command "Test-Path \$env:USERPROFILE\.starsignal*" | grep -q "True"
     else
         ls "$HOME/.starsignal"* >/dev/null 2>&1
     fi
-    if [ $? -eq 0 ]; then
-        log "找到存档文件：$(ls "$HOME/.starsignal"* 2>/dev/null || powershell -Command "Get-ChildItem -Path $env:USERPROFILE\.starsignal* | Select-Object -ExpandProperty Name")"
-        return 0
-    fi
-    log "未找到存档文件"
-    return 1
+    return $?
 }
 
 # 修复权限
 fix_permissions() {
     log "正在修复存档文件权限..."
     if [ "$OS" = "windows" ]; then
-        powershell -Command "Get-ChildItem -Path $env:USERPROFILE\.starsignal* | ForEach-Object { icacls `$_.FullName /grant Everyone:F }" 2>/dev/null || log "$(translate "permission_warning")"
+        powershell -Command "Get-ChildItem -Path \$env:USERPROFILE\.starsignal* | ForEach-Object { icacls \$_.FullName /grant Everyone:F }" 2>/dev/null || log "$(translate "permission_warning")"
     else
         chmod 666 "$HOME/.starsignal"* 2>/dev/null || log "$(translate "permission_warning")"
     fi
@@ -508,7 +503,7 @@ update_starsignal() {
 repair_starsignal() {
     log "正在修复 starsignal 安装..."
     if check_starsignal; then
-        INSTALLED_BRANCH=$($PIP_CMD show starsignal | grep -o "git+.*@.*" | grep -o "@.*" | cut -d@ -f2)
+        INSTALLED_BRANCH=$($PIP_CMD show starsignal | grep -o "git+.*@.*" | cut -d@ -f2)
         BRANCH=${INSTALLED_BRANCH:-"main"}
     else
         BRANCH="main"
@@ -532,7 +527,7 @@ clean_saves() {
     if check_saves; then
         echo "$(translate "cleaning_saves")"
         if [ "$OS" = "windows" ]; then
-            echo "找到存档文件：$(powershell -Command "Get-ChildItem -Path $env:USERPROFILE\.starsignal* | Select-Object -ExpandProperty Name")"
+            echo "找到存档文件：$(powershell -Command "Get-ChildItem -Path \$env:USERPROFILE\.starsignal* | Select-Object -ExpandProperty Name")"
         else
             echo "找到存档文件：$(ls "$HOME/.starsignal"*)"
         fi
@@ -540,7 +535,7 @@ clean_saves() {
         read -r confirm
         if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
             if [ "$OS" = "windows" ]; then
-                powershell -Command "Remove-Item -Path $env:USERPROFILE\.starsignal* -Force" || die "$(translate "error" "无法清理存档文件")"
+                powershell -Command "Remove-Item -Path \$env:USERPROFILE\.starsignal* -Force" || die "$(translate "error" "无法清理存档文件")"
             else
                 rm -f "$HOME/.starsignal"* || die "$(translate "error" "无法清理存档文件")"
             fi
