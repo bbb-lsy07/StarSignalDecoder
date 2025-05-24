@@ -26,6 +26,7 @@ class Display:
         ╚══════════════════════════════════════╝
         欢迎，信号官！飞船被困危险星域！
         挑战 3 关，解码信号，收集核心！
+        保持能量 ≥ 60% 以通关！
         按 'h' 提示，'s' 保存，'q' 退出。
         """
         self._animate_text(intro, Fore.CYAN)
@@ -40,23 +41,32 @@ class Display:
         5. 按 'h' 提示，'s' 保存，'q' 退出。
         试试：信号 7*3#1，规则：忽略非数字字符
         答案：A) 731 B) 137 C) 713
-        输入编号（1-3）：
+        输入编号（1-3）或 'skip' 跳过：
         """
         print(self.color_text(tutorial, Fore.YELLOW))
-        choice = input().strip()
-        if choice == "1":
+        choice = input().strip().lower()
+        if choice == "skip":
+            print(self.color_text("教程已跳过！", Fore.YELLOW))
+        elif choice == "1":
             print(self.color_text("正确！答案是 731！", Fore.GREEN))
         else:
             print(self.color_text("答案是 731，继续练习！", Fore.YELLOW))
         print("按回车继续...")
         input()
 
+    def show_mode_selection(self, unlocked_levels, has_progress, endless_unlocked):
+        print(self.color_text("\n选择模式：", Fore.CYAN))
+        print("1) 新游戏（关卡 1）")
+        print(f"2) 继续（关卡 {has_progress['level'] if has_progress else 1}）" if has_progress else "2) 继续（无进度）")
+        print(f"3) 选择关卡（已解锁：{', '.join(map(str, unlocked_levels))})")
+        print(f"4) 无尽模式（{'已解锁' if endless_unlocked else '未解锁'}）")
+
     def show_signal(self, signal, rule, options, energy, score, cores, stage, level, signal_strength, weather, equipment, task):
         strength_text = ["弱", "中", "强"][signal_strength - 1]
         weather_text = {"clear": "晴朗", "storm": "风暴", "fog": "迷雾"}[weather]
         equip_text = equipment or "无"
         task_text = task["description"] if task else "无"
-        warning = Fore.RED if energy < 30 else Fore.YELLOW if energy < 50 else Fore.WHITE
+        warning = Fore.RED if energy < 30 else Fore.YELLOW if energy < 60 else Fore.WHITE
         print(self.color_text(f"\n关卡 {level} | 天气：{weather_text} | 装备：{equip_text}", Fore.MAGENTA))
         print(self.color_text(f"NPC任务：{task_text}", Fore.BLUE))
         print(self.color_text(f"信号（强度：{strength_text}）：", Fore.GREEN))
@@ -85,7 +95,7 @@ class Display:
         boss = """
         ╔══════ Boss 信号 ══════╗
         警告：检测到超强信号！
-        准备解码，成功将获高额奖励！
+        准备解码，成功获高额奖励！
         ╚═══════════════════════╝
         """
         self._animate_text(boss, Fore.RED)
@@ -118,14 +128,15 @@ class Display:
             "interference": "NPC: '信号干扰，时间减少！'",
             "fault": "NPC: '系统故障，能量下降！'",
             "bonus": "NPC: '能量脉冲，抓住机会！'",
+            "storm": "NPC: '能量风暴，随机效果！'",
             "merchant": "NPC: '我是星际商人，换点装备？'"
         }
         task_dialogues = {
             "strong_signals": "NPC: '优先解码强信号，奖励更高！'",
-            "no_mistakes": "NPC: '保持无误，证明你的技术！'"
+            "no_mistakes": "NPC: '连续无误，证明你的技术！'"
         }
         if event_type:
-            print(self.color_text(event_dialogues[event_type], Fore.RED if event_type in ["interference", "fault"] else Fore.GREEN))
+            print(self.color_text(event_dialogues[event_type], Fore.RED if event_type in ["interference", "fault", "storm"] else Fore.GREEN))
         elif task:
             print(self.color_text(task_dialogues[task["type"]], Fore.BLUE))
         elif weather:
@@ -141,11 +152,11 @@ class Display:
         hint = f"提示：规则“{rule}”。分析信号，忽略干扰！输入编号（如 1），'s' 保存，'q' 退出。"
         print(self.color_text(hint, Fore.YELLOW))
 
-    def show_ending(self, score, cores, levels_cleared):
-        if levels_cleared >= 3 and score > 100:
+    def show_ending(self, score, cores, levels_cleared, energy):
+        if levels_cleared >= 3 and energy >= 80 and score > 100:
             ending = "结局：星际传奇！你以高分通关，成为信号官神话！"
             color = Fore.GREEN
-        elif levels_cleared >= 3:
+        elif levels_cleared >= 3 and energy >= 60:
             ending = "结局：险象环生！你通关，但飞船伤痕累累。"
             color = Fore.YELLOW
         else:
@@ -159,7 +170,7 @@ class Display:
     def show_rankings(self, rankings):
         print(self.color_text("\n排行榜：", Fore.CYAN))
         for i, rank in enumerate(rankings, 1):
-            print(f"{i}. 得分：{rank['score']} | 关卡：{rank['level']} | 模式：{rank['mode']}")
+            print(f"{i}. 得分：{rank['score']} | 关卡：{rank['level']} | 模式：{rank['mode']} | 时间：{rank['time']}")
 
     def _animate_waveform(self, signal, strength):
         waveform = ["  " * len(signal) for _ in range(3)]
@@ -175,6 +186,8 @@ class Display:
             print("\033[3A\033[K", end="")
         for line in waveform:
             print(self.color_text(line, Fore.GREEN))
+        if strength == "强":
+            print(self.color_text("[滴滴！强信号！]", Fore.YELLOW))
 
     def _progress_bar(self, cores, total):
         filled = min(cores, total)
