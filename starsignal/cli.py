@@ -26,10 +26,6 @@ def main():
         help="进入练习模式，无能量惩罚"
     )
     parser.add_argument(
-        "--endless", action="store_true",
-        help="进入无尽模式（通关解锁）"
-    )
-    parser.add_argument(
         "--load", type=int, choices=[1, 2, 3],
         help="加载存档槽位（1-3）"
     )
@@ -38,8 +34,7 @@ def main():
     game = StarSignalGame(
         difficulty=args.difficulty,
         load_slot=args.load,
-        practice=args.practice,
-        endless=args.endless
+        practice=args.practice
     )
     if args.tutorial or game.is_first_time():
         game.display.show_tutorial()
