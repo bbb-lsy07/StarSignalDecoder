@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 星际迷航：信号解码 游戏管理脚本 v1.7.4
+# 星际迷航：信号解码 游戏管理脚本 v1.7.5
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 
@@ -595,7 +595,7 @@ do_clean_saves() {
             print_status "${CLEAN_SUCCESS}"
             log_message "${CLEAN_SUCCESS}"
         else
-            print_error "${CLEAN_FAILED}"
+            print_error "${CLE_FAILED}"
             log_message "${CLEAN_FAILED}"
             return 1 # 清理失败
         fi
@@ -657,30 +657,49 @@ show_main_menu() {
         exit 1
     fi
 
-    echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║    ${INSTALLATION_MENU}           ${NC}"
-    echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
+    local choice_made=false
+    local choice=""
 
-    if is_installed; then
-        echo -e "${GREEN}${ALREADY_INSTALLED}${NC}"
-        echo "1) ${UPDATE_GAME}"
-        echo "2) ${REPAIR_GAME}"
-        echo "3) ${CLEAN_SAVES}"
-        echo "4) ${UNINSTALL_GAME}"
-        echo "0) ${EXIT_OPTION}"
-    else
-        echo -e "${YELLOW}${NOT_INSTALLED}${NC}"
-        echo "1) ${INSTALL_MAIN}"
-        echo "2) ${INSTALL_DEV}"
-        echo "0) ${EXIT_OPTION}"
-    fi
+    while ! "$choice_made"; do
+        echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
+        echo -e "${CYAN}║    ${INSTALLATION_MENU}           ${NC}"
+        echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
 
-    echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-    local choice
-    read -r choice || true # Read user input, prevent script exiting on CTRL+D
-    echo # Add newline after input
+        if is_installed; then
+            echo -e "${GREEN}${ALREADY_INSTALLED}${NC}"
+            echo "1) ${UPDATE_GAME}"
+            echo "2) ${REPAIR_GAME}"
+            echo "3) ${CLEAN_SAVES}"
+            echo "4) ${UNINSTALL_GAME}"
+            echo "0) ${EXIT_OPTION}"
+        else
+            echo -e "${YELLOW}${NOT_INSTALLED}${NC}"
+            echo "1) ${INSTALL_MAIN}"
+            echo "2) ${INSTALL_DEV}"
+            echo "0) ${EXIT_OPTION}"
+        fi
+
+        echo -en "${BLUE}${ENTER_CHOICE}${NC}"
+        read -r choice # Read user input
+        echo # Add newline after input
+
+        if [ -z "$choice" ]; then
+            print_error "${INVALID_CHOICE} (Input cannot be empty)"
+        elif ! [[ "$choice" =~ ^[0-9]$ ]]; then # Only allow single digit input for now
+            print_error "${INVALID_CHOICE} (Please enter a number from the list)"
+        else
+            choice_made=true
+        fi
+        
+        if ! "$choice_made"; then
+            echo # Add a newline for spacing before re-displaying menu
+            echo -e "${CYAN}${PRESS_ANY_KEY}${NC}"
+            read -n 1 -s # Wait for any key to clear and redraw
+            clear # Clear before redraw
+        fi
+    done
     
-    echo "$choice" # Return the choice
+    echo "$choice" # Return the valid choice
 }
 
 # --- 脚本入口点 ---
@@ -694,7 +713,7 @@ main() {
     # 清空并开始记录新的日志会话
     > "$LOG_FILE"
     log_message "----------------------------------------------------"
-    log_message "星际迷航：信号解码 管理脚本启动 v1.7.4"
+    log_message "星际迷航：信号解码 管理脚本启动 v1.7.5"
     log_message "操作系统: $OS"
     log_message "语言设置: $LANG_SET"
     log_message "----------------------------------------------------"
