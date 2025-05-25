@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 星际迷航：信号解码 游戏管理脚本 v1.7.6
+# 星际迷航：信号解码 游戏管理脚本 v1.7.6beta
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 
@@ -67,7 +67,7 @@ set_texts() {
         REPAIR_SUCCESS="StarSignalDecoder repaired successfully!"
         REPAIR_FAILED="Repair failed. Possible network issues or missing dependencies. Check the output above and your internet connection." # 更具体
         CLEAN_SUCCESS="Save data and achievements cleaned successfully!"
-        CLEEN_FAILED="Failed to clean save data. Check permissions or try manually."
+        CLEAN_FAILED="Failed to clean save data. Check permissions or try manually."
         UNINSTALL_SUCCESS="StarSignalDecoder uninstalled successfully! Save data also removed."
         UNINSTALL_FAILED="Uninstallation failed. Please check the output above for details."
         PERMISSION_FIX="Attempting to fix save file permissions..."
@@ -546,8 +546,6 @@ do_update_game() {
     fi
 
     local branch
-    # read -r -p "$(echo -e "${YELLOW}${CHOOSE_BRANCH}${NC}")" branch < /dev/tty # Read from TTY
-    # 更安全的输入处理
     local valid_branch=false
     while ! "$valid_branch"; do
         read -r -p "$(echo -e "${YELLOW}${CHOOSE_BRANCH}${NC}")" branch < /dev/tty
@@ -740,7 +738,7 @@ main() {
     # 清空并开始记录新的日志会话
     > "$LOG_FILE"
     log_message "----------------------------------------------------"
-    log_message "星际迷航：信号解码 管理脚本启动 v1.7.5" # 实际显示版本是1.7.5，README是1.7.1，会更新README
+    log_message "星际迷航：信号解码 管理脚本启动 v1.7.6" # 更新到1.7.6
     log_message "操作系统: $OS"
     log_message "语言设置: $LANG_SET"
     log_message "----------------------------------------------------"
