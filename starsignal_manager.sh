@@ -1,9 +1,11 @@
 #!/bin/bash
 
 # ==============================================================================
-# 星际迷航：信号解码 - 全功能管理脚本 v2.0.1
+# 星际迷航：信号解码 - 全功能管理脚本 v2.5.0
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
+#
+# **核心重构版，旨在彻底解决交互式输入问题与鲁棒性**
 #
 # 功能：
 #   - 跨平台支持 (Linux/macOS 自动化，Windows 提供详细手动指南)
@@ -32,13 +34,7 @@ GAME_NAME="starsignal"
 DATA_FILE="$HOME/.starsignal_data.json"
 LOG_FILE="$HOME/.starsignal_manager.log" # 仅记录脚本自身核心运行信息
 SAVE_FILE_PREFIX="$HOME/.starsignal_save_"
-SCRIPT_VERSION="2.0.1" # 脚本自身版本
-
-# 检查当前是否在终端运行 (仅用于警告，不强制)
-IS_TERMINAL=true
-if ! [ -t 0 ]; then
-  IS_TERMINAL=false
-fi
+SCRIPT_VERSION="2.5.0" # 脚本自身版本
 
 # 获取当前脚本的语言设置，默认中文
 LANG_SET="zh"
@@ -74,7 +70,7 @@ set_texts() {
         GIT_NOT_FOUND="Git not found. Attempting to install Git..."
         INSTALLING_GAME="Installing StarSignalDecoder..."
         INSTALL_SUCCESS="StarSignalDecoder installed successfully!"
-        INSTALL_FAILED="Installation failed. Possible network issues, missing dependencies, or outdated pip. Check the output above and your internet connection."
+        INSTALL_FAILED="Installation failed. Possible network issues, missing dependencies, or outdated pip. Check the output above and your internet connection. Try 'ping github.com'."
         UPDATE_SUCCESS="StarSignalDecoder updated successfully!"
         UPDATE_FAILED="Update failed. Possible network issues, missing dependencies, or outdated pip. Check the output above and your internet connection."
         REPAIR_SUCCESS="StarSignalDecoder repaired successfully!"
@@ -98,9 +94,7 @@ set_texts() {
         CHECKING_TERMINAL_ENCODING="Checking terminal encoding..."
         ENCODING_WARNING="Your terminal encoding might not be UTF-8. This can cause display issues. Please set your terminal to UTF-8 (e.g., ${YELLOW}export LANG=en_US.UTF-8${NC} or ${YELLOW}chcp 65001${NC} on Windows)."
         PRESS_ENTER_TO_CONTINUE="Press Enter to continue..."
-        INVALID_INPUT_EMPTY="Input cannot be empty."
-        INVALID_INPUT_NOT_NUMBER="Please enter a number from the list."
-        GAME_START_OPTIONS="Enter game start options (e.g., --difficulty hard --tutorial): "
+        GAME_START_OPTIONS_PROMPT="Enter game start options (e.g., --difficulty hard --tutorial): "
         GAME_START_NOTE="If game input seems stuck, try running in a native terminal, or use 'stty sane' and 'export TERM=xterm-256color'."
         MANUAL_INSTALL_HEADER="【Manual Installation Guide】"
         MANUAL_INSTALL_REQUIREMENTS="Requirements:"
@@ -148,7 +142,7 @@ set_texts() {
         GIT_NOT_FOUND="未检测到 Git。正在尝试安装 Git..."
         INSTALLING_GAME="正在安装 星际迷航：信号解码..."
         INSTALL_SUCCESS="星际迷航：信号解码 安装成功！"
-        INSTALL_FAILED="安装失败。可能存在网络问题、依赖缺失或 pip 版本过旧。请检查终端输出、您的互联网连接，并考虑更新 pip。"
+        INSTALL_FAILED="安装失败。可能存在网络问题、依赖缺失或 pip 版本过旧。请检查终端输出、您的互联网连接，并尝试 'ping github.com'。"
         UPDATE_SUCCESS="星际迷航：信号解码 更新成功！"
         UPDATE_FAILED="更新失败。可能存在网络问题、依赖缺失或 pip 版本过旧。请检查终端输出和您的互联网连接。"
         REPAIR_SUCCESS="星际迷航：信号解码 修复成功！"
@@ -172,9 +166,7 @@ set_texts() {
         CHECKING_TERMINAL_ENCODING="正在检查终端编码..."
         ENCODING_WARNING="您的终端编码可能不是 UTF-8。这可能导致显示问题。请将终端设置为 UTF-8（例如 ${YELLOW}export LANG=zh_CN.UTF-8${NC} 或 Windows 上 ${YELLOW}chcp 65001${NC}）。"
         PRESS_ENTER_TO_CONTINUE="按回车键继续..."
-        INVALID_INPUT_EMPTY="输入不能为空。"
-        INVALID_INPUT_NOT_NUMBER="请输入列表中的数字。"
-        GAME_START_OPTIONS="请输入游戏启动选项（例如 --difficulty hard --tutorial）："
+        GAME_START_OPTIONS_PROMPT="请输入游戏启动选项（例如 --difficulty hard --tutorial）："
         GAME_START_NOTE="提示：如果游戏输入卡顿，请尝试在本地终端运行，或尝试运行 'stty sane' 和 'export TERM=xterm-256color'。"
         MANUAL_INSTALL_HEADER="【手动安装指南】"
         MANUAL_INSTALL_REQUIREMENTS="要求："
@@ -257,20 +249,15 @@ get_user_input() {
     # Loop until valid input is received
     while ! "$valid_input"; do
         # Print prompt
-        echo -en "$prompt"
+        echo -en "$prompt" # -n for no newline, -e for escape sequences
         
         # Attempt to read from /dev/tty directly for robust interactive input
-        # Use -t 60 for timeout to prevent indefinite hang in non-ideal TTYs
-        # Using read -r -n 1 for single char (y/n) and read -r for full line
-        if [[ "$input_type" == "yes_no" ]]; then
-            if ! read -r -n 1 -t 60 choice < /dev/tty; then
-                choice="" # If timeout or read fails, set choice to empty
-            fi
-        else # For "text" or "menu_choice_*"
-            if ! read -r -t 60 choice < /dev/tty; then
-                choice="" # If timeout or read fails, set choice to empty
-            fi
+        # Using read -r to prevent backslash interpretation
+        # Note: No -t (timeout) here. Read should block until input is received.
+        if ! read -r choice < /dev/tty; then
+            choice="" # If read fails for some reason, treat as empty
         fi
+        
         echo # Always add a newline after input attempt (for clarity)
 
         # Validate input based on type
@@ -319,7 +306,7 @@ get_user_input() {
             echo # Newline for spacing
             echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}"
             # Wait for Enter, silent, read from /dev/tty
-            read -r -s -t 60 < /dev/tty
+            read -r -s < /dev/tty
             echo # Newline
             clear # Clear screen before re-displaying prompt
         fi
@@ -498,9 +485,8 @@ fix_path() {
         else
             print_error "${PATH_FIX_FAILED}"
             log_message "PATH fix failed for Windows (Python scripts path not found)."
-        fi
-    fi
-    log_message "PATH 修复尝试完成。"
+        _fi
+    _log_message "PATH 修复尝试完成。"
 }
 
 # 检查终端编码，并提供提示
@@ -574,7 +560,7 @@ fix_save_permissions() {
 
 # 检查游戏是否已安装
 is_installed() {
-    command_exists "$GAME_NAME"
+    command -v "$GAME_NAME"
 }
 
 # --- 核心功能函数 (do_*) ---
@@ -582,25 +568,21 @@ is_installed() {
 # 执行环境检查与安装依赖
 run_environment_setup() {
     print_status "${INSTALLING_DEPENDENCIES}"
-    # 检查并安装 Python 3
     if ! install_python; then
         print_error "Python installation/check failed. Cannot proceed."
         return 1
     fi
 
-    # 检查并安装 pip
     if ! install_pip; then
         print_error "pip installation/check failed. Cannot proceed."
         return 1
     fi
 
-    # 检查并安装 Git
     if ! install_git; then
         print_error "Git installation/check failed. Cannot proceed."
         return 1
     fi
 
-    # 检查 PATH 和终端编码
     check_path_for_starsignal
     check_terminal_encoding
     
@@ -625,9 +607,9 @@ do_install_game() {
     else
         print_error "${INSTALL_FAILED}"
         log_message "${INSTALL_FAILED}"
-        return 1
+        return 1 # 安装失败
     fi
-    return 0
+    return 0 # 安装成功
 }
 
 # 更新游戏
@@ -650,9 +632,9 @@ do_update_game() {
     else
         print_error "${UPDATE_FAILED}"
         log_message "${UPDATE_FAILED}"
-        return 1
+        return 1 # 更新失败
     fi
-    return 0
+    return 0 # 更新成功
 }
 
 # 修复安装
@@ -672,9 +654,9 @@ do_repair_game() {
     else
         print_error "${REPAIR_FAILED}"
         log_message "${REPAIR_FAILED}"
-        return 1
+        return 1 # 修复失败
     fi
-    return 0
+    return 0 # 修复成功
 }
 
 # 清理存档
@@ -694,14 +676,14 @@ do_clean_saves() {
         else
             print_error "${CLEAN_FAILED}"
             log_message "${CLEAN_FAILED}"
-            return 1
+            return 1 # 清理失败
         fi
     else
         print_status "${CANCELLED}"
         log_message "Clean saves cancelled."
-        return 1
+        return 1 # 操作取消
     fi
-    return 0
+    return 0 # 清理成功
 }
 
 # 卸载游戏
@@ -732,16 +714,16 @@ do_uninstall_game() {
         if ! is_installed; then
             print_status "${UNINSTALL_SUCCESS}"
             log_message "${UNINSTALL_SUCCESS}"
-            return 0
+            return 0 # 卸载成功
         else
             print_error "${UNINSTALL_FAILED}"
             log_message "${UNINSTALL_FAILED}"
-            return 1
+            return 1 # 卸载失败
         fi
     else
         print_status "${CANCELLED}"
         log_message "Uninstall cancelled."
-        return 1
+        return 1 # 操作取消
     fi
 }
 
@@ -753,21 +735,27 @@ do_start_game() {
         return 1
     fi
     
-    local game_options=$(get_user_input "${BLUE}${GAME_START_OPTIONS}${NC}" "text")
+    local game_options=$(get_user_input "${BLUE}${GAME_START_OPTIONS_PROMPT}${NC}" "text")
     
     print_status "正在启动游戏: starsignal ${game_options}"
     log_message "Starting game: starsignal ${game_options}"
     
-    # 尝试直接运行游戏
     if command_exists starsignal; then
-        # 提示用户如果遇到交互问题如何处理
         print_warning "${GAME_START_NOTE}"
-        # 直接运行游戏，并确保标准输入/输出/错误与TTY连接
-        # 使用exec将当前shell替换为游戏进程，或直接运行并管理其IO
-        starsignal ${game_options} < /dev/tty > /dev/tty 2>&1
-        if [ $? -ne 0 ]; then
-            print_error "游戏运行出错。请检查上述错误信息，或尝试解决终端兼容性问题。"
-            log_message "Game exited with error status."
+        # 尝试通过 /usr/bin/env python3 运行，确保使用正确的 python 版本，
+        # 并显式连接 stdin/stdout/stderr 到 /dev/tty 以解决交互问题
+        # 这种方式更健壮，但如果游戏本身对TTY有特殊要求，仍可能出问题
+        # exec 替换当前shell进程，如果游戏退出，脚本也退出
+        # starsignal "${game_options}" < /dev/tty > /dev/tty 2>&1
+        
+        # 更安全的做法是直接调用 starsignal，让它自己处理IO，但加上环境提示
+        # 如果游戏本身确实有问题，这个脚本无法直接修复游戏代码
+        starsignal ${game_options}
+        local game_exit_code=$?
+
+        if [ "$game_exit_code" -ne 0 ]; then
+            print_error "游戏运行出错（退出码：${game_exit_code}）。请检查上述错误信息，或尝试解决终端兼容性问题。"
+            log_message "Game exited with error status: ${game_exit_code}."
             return 1
         fi
     else
@@ -802,7 +790,7 @@ do_show_manual_guide() {
     echo "   ${MANUAL_INSTALL_WINDOWS_PYTHON}"
     echo "2. 安装 Git for Windows："
     echo "   ${MANUAL_INSTALL_WINDOWS_GIT}"
-    echo "3. 手动添加 PATH (如果 'starsignal' 命令无法找到)："
+    echo "3. 手动添加 PATH (如果 'starsignal' 命令未找到)："
     echo "   ${MANUAL_INSTALL_WINDOWS_PATH}"
     echo ""
     echo -e "${GREEN}${MANUAL_INSTALL_GAME_CORE}${NC}"
@@ -817,26 +805,25 @@ do_show_manual_guide() {
     echo ""
     echo -e "${CYAN}==================================================================${NC}"
     echo ""
-    get_user_input "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" "text" > /dev/null # Wait for Enter
+    # Use generic text input for "Press Enter to continue"
+    get_user_input "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" "text" > /dev/null
 }
 
 
-# --- 主菜单 ---
-show_main_menu_and_get_choice() {
+# --- 主菜单及其交互逻辑 ---
+display_menu_and_get_choice() {
     local choice=""
     local valid_choice=false
 
     while ! "$valid_choice"; do
-        clear # Clear screen before each menu display
-        if ! "$IS_TERMINAL"; then
-            print_warning "${WARNING_PIPE}"
-            exit 1
-        fi
-
+        clear # 每次显示菜单前清屏
+        
+        # 打印菜单头
         echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
         echo -e "${CYAN}║    ${INSTALLATION_MENU}           ${NC}"
         echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
 
+        # 根据游戏是否安装显示不同选项
         if is_installed; then
             echo -e "${GREEN}${ALREADY_INSTALLED}${NC}"
             echo "1) ${UPDATE_GAME}"
@@ -847,49 +834,56 @@ show_main_menu_and_get_choice() {
             echo "6) ${SHOW_MANUAL}"
             echo "0) ${EXIT_OPTION}"
             
+            # 获取用户输入
             choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_installed")
             
+            # 验证输入
             case "$choice" in
                 0|1|2|3|4|5|6) valid_choice=true ;;
-                *) print_error "${INVALID_CHOICE}" ;;
+                *) # get_user_input 已经处理了空和非数字，这里只需通用错误提示
+                    print_error "${INVALID_CHOICE}"
+                    # get_user_input 内部会处理按回车继续和清屏，无需在此处额外处理
+                    ;;
             esac
-        else # Not installed
+        else # 游戏未安装
             echo -e "${YELLOW}${NOT_INSTALLED}${NC}"
             echo "1) ${INSTALL_MAIN}"
             echo "2) ${INSTALL_DEV}"
             echo "3) ${SHOW_MANUAL}"
             echo "0) ${EXIT_OPTION}"
             
+            # 获取用户输入
             choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_not_installed")
 
+            # 验证输入
             case "$choice" in
                 0|1|2|3) valid_choice=true ;;
-                *) print_error "${INVALID_CHOICE}" ;;
+                *) # get_user_input 已经处理了空和非数字，这里只需通用错误提示
+                    print_error "${INVALID_CHOICE}"
+                    # get_user_input 内部会处理按回车继续和清屏，无需在此处额外处理
+                    ;;
             esac
         fi
 
-        if ! "$valid_choice"; then
-            # Error message is already printed by get_user_input
-            # get_user_input also handles "Press Enter to continue" and clears screen
-            : # No extra prompt needed here, get_user_input manages loop and display.
-        fi
+        # 如果输入无效，get_user_input 会自动提示并清屏重绘，所以这里无需额外逻辑
     done
     
-    echo "$choice" # Return the valid choice
+    echo "$choice" # 返回有效的用户选择
 }
 
 # --- 脚本入口点 ---
 main() {
-    # 如果脚本通过管道运行，打印警告并退出
-    if ! "$IS_TERMINAL"; then
+    # 检查是否在交互式终端运行的警告（非强制退出）
+    if ! [ -t 0 ] || ! [ -t 1 ]; then
         print_warning "${WARNING_PIPE}"
-        exit 1
+        # 如果脚本在非交互式环境中运行，但不强制退出，则可以提供一个简单的非交互式安装模式
+        # 目前我们仍然希望它能交互，所以保留警告，但更依赖/dev/tty
     fi
 
     # 清空并开始记录新的日志会话
     > "$LOG_FILE"
     log_message "----------------------------------------------------"
-    log_message "星际迷航：信号解码 管理脚本启动 v${SCRIPT_VERSION}" # 使用SCRIPT_VERSION变量
+    log_message "星际迷航：信号解码 管理脚本启动 v${SCRIPT_VERSION}"
     log_message "操作系统: $OS"
     log_message "语言设置: $LANG_SET"
     log_message "----------------------------------------------------"
@@ -898,10 +892,10 @@ main() {
     check_terminal_encoding
 
     while true; do
-        local user_choice=$(show_main_menu_and_get_choice) # 调用菜单并获取用户选择
+        local user_choice=$(display_menu_and_get_choice) # 调用菜单并获取用户选择
         log_message "User selected: $user_choice"
         
-        # Clear screen before executing action
+        # 清屏，然后执行选择的操作
         clear
 
         if is_installed; then
@@ -913,7 +907,7 @@ main() {
                 5) do_start_game ;;
                 6) do_show_manual_guide ;;
                 0) exit 0 ;;
-                *) print_error "${INVALID_CHOICE}" ;;
+                *) print_error "${INVALID_CHOICE}" ;; # Should ideally not be reached if get_user_input works
             esac
         else # Not installed
             case "$user_choice" in
@@ -921,15 +915,16 @@ main() {
                 2) do_install_game dev ;;
                 3) do_show_manual_guide ;;
                 0) exit 0 ;;
-                *) print_error "${INVALID_CHOICE}" ;;
+                *) print_error "${INVALID_CHOICE}" ;; # Should ideally not be reached if get_user_input works
             esac
         fi
         
-        # After executing a function, pause and clear screen before next menu loop
-        echo # Add empty line for spacing
+        # 每次功能执行完毕后，暂停并清屏，准备显示下一个菜单
+        echo # 添加空行，视觉效果
         echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}"
-        read -r -s < /dev/tty # Wait for Enter, read from /dev/tty
-        echo # Add newline
+        # 使用 read -r -s < /dev/tty 来等待回车，确保兼容性
+        read -r -s < /dev/tty
+        echo # 添加换行
     done
 }
 
