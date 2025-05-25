@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 星际迷航：信号解码 游戏管理脚本 v1.7.3
+# 星际迷航：信号解码 游戏管理脚本 v1.7.4
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 
@@ -109,11 +109,11 @@ set_texts() {
         GIT_NOT_FOUND="未检测到 Git。正在尝试安装 Git..."
         INSTALLING_GAME="正在安装 星际迷航：信号解码..."
         INSTALL_SUCCESS="星际迷航：信号解码 安装成功！"
-        INSTALL_FAILED="安装失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。" # 更具体
+        INSTALL_FAILED="安装失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。"
         UPDATE_SUCCESS="星际迷航：信号解码 更新成功！"
-        UPDATE_FAILED="更新失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。" # 更具体
+        UPDATE_FAILED="更新失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。"
         REPAIR_SUCCESS="星际迷航：信号解码 修复成功！"
-        REPAIR_FAILED="修复失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。" # 更具体
+        REPAIR_FAILED="修复失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。"
         CLEAN_SUCCESS="存档和成就数据清理成功！"
         CLEAN_FAILED="清理存档失败。请检查文件权限或手动尝试。"
         UNINSTALL_SUCCESS="星际迷航：信号解码 卸载成功！存档数据已移除。"
@@ -237,7 +237,8 @@ check_python_env() {
         print_status "${GIT_FOUND}"
     fi
 
-    check_path_for_starsignal # 这里的 PATH 修复提示需要用户输入
+    # 这里的 PATH 修复提示需要用户输入，在安装或更新前执行
+    check_path_for_starsignal
     check_terminal_encoding
     return 0 # 环境检查成功
 }
@@ -371,7 +372,7 @@ check_path_for_starsignal() {
     if ! command_exists "$GAME_NAME"; then
         read -r -p "$(echo -e "${YELLOW}${PATH_FIX_PROMPT}${NC}")" -n 1 REPLY
         echo # 添加换行
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [[ "$REPLY" =~ ^[Yy]$ ]]; then # Ensure case-insensitive check
             fix_path
         fi
     fi
@@ -468,8 +469,21 @@ fix_save_permissions() {
             log_message "${PERMISSION_FAILED}"
         fi
     elif [ "$OS" == "Windows" ]; then
-        if powershell.exe -Command "If (Test-Path \"$env:USERPROFILE\\.starsignal_data.json\") { icacls \"$env:USERPROFILE\\.starsignal_data.json\" /grant Everyone:F }" >/dev/null 2>&1 && \
-           powershell.exe -Command "If (Test-Path \"$env:USERPROFILE\\.starsignal_save_*.json\") { icacls \"$env:USERPROFILE\\.starsignal_save_*.json\" /grant Everyone:F }" >/dev/null 2>&1; then
+        # Check if files exist before trying to modify permissions
+        local data_file_exists=$(powershell.exe -Command "Test-Path \"$env:USERPROFILE\\.starsignal_data.json\"" 2>/dev/null)
+        local save_files_exist=$(powershell.exe -Command "Test-Path \"$env:USERPROFILE\\.starsignal_save_*.json\"" 2>/dev/null)
+
+        local success=0
+        if [[ "$data_file_exists" == "True" || "$save_files_exist" == "True" ]]; then
+            if powershell.exe -Command "icacls \"$env:USERPROFILE\\.starsignal*\" /grant Everyone:F" >/dev/null 2>&1; then
+                success=1
+            fi
+        else
+            # If no files exist, it's implicitly successful as there's nothing to fix.
+            success=1
+        fi
+
+        if [ "$success" -eq 1 ]; then
             print_status "${PERMISSION_SUCCESS}"
             log_message "${PERMISSION_SUCCESS}"
         else
@@ -479,12 +493,13 @@ fix_save_permissions() {
     fi
 }
 
+
 # 检查游戏是否已安装
 is_installed() {
     command_exists "$GAME_NAME"
 }
 
-# --- 核心功能函数 ---
+# --- 核心功能函数 (do_*) ---
 
 # 安装游戏
 do_install_game() {
@@ -492,7 +507,7 @@ do_install_game() {
     print_status "${INSTALLING_DEPENDENCIES}"
     # 检查环境，如果环境检查失败，则不继续安装
     if ! check_python_env; then
-        print_error "Environment check failed. Cannot proceed with installation."
+        print_error "Environment check failed. Installation aborted."
         log_message "Environment check failed. Installation aborted."
         return 1
     fi
@@ -571,9 +586,9 @@ do_clean_saves() {
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_status "${CLEAN_SAVES}"
         log_message "开始清理存档和成就数据..."
-        rm -f "$DATA_FILE" # 不再重定向
+        rm -f "$DATA_FILE"
         for i in {1..3}; do
-            rm -f "${SAVE_FILE_PREFIX}${i}.json" # 不再重定向
+            rm -f "${SAVE_FILE_PREFIX}${i}.json"
         done
 
         if [ ! -f "$DATA_FILE" ] && [ ! -f "${SAVE_FILE_PREFIX}1.json" ] && [ ! -f "${SAVE_FILE_PREFIX}2.json" ] && [ ! -f "${SAVE_FILE_PREFIX}3.json" ]; then
@@ -601,7 +616,6 @@ do_uninstall_game() {
         log_message "开始卸载游戏..."
         
         local uninstall_successful=0
-        # 尝试卸载游戏
         if command_exists "$PIP_CMD"; then
             if "$PIP_CMD" uninstall -y "$GAME_NAME"; then
                 uninstall_successful=1
@@ -614,13 +628,11 @@ do_uninstall_game() {
             log_message "Pip command not found for uninstall."
         fi
 
-        # 移除数据文件和存档文件
         rm -f "$DATA_FILE"
         for i in {1..3}; do
             rm -f "${SAVE_FILE_PREFIX}${i}.json"
         done
 
-        # 最终检查是否已卸载
         if ! is_installed; then
             print_status "${UNINSTALL_SUCCESS}"
             log_message "${UNINSTALL_SUCCESS}"
@@ -638,10 +650,10 @@ do_uninstall_game() {
 }
 
 # --- 主菜单 ---
-show_menu() {
+show_main_menu() {
+    clear # 清屏以避免旧内容干扰
     if ! "$IS_TERMINAL"; then
         print_warning "${WARNING_PIPE}"
-        # 退出，因为非交互式无法继续
         exit 1
     fi
 
@@ -664,10 +676,11 @@ show_menu() {
     fi
 
     echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-    read -r choice # Read user input
+    local choice
+    read -r choice || true # Read user input, prevent script exiting on CTRL+D
     echo # Add newline after input
     
-    echo "$choice" # 返回用户选择
+    echo "$choice" # Return the choice
 }
 
 # --- 脚本入口点 ---
@@ -681,7 +694,7 @@ main() {
     # 清空并开始记录新的日志会话
     > "$LOG_FILE"
     log_message "----------------------------------------------------"
-    log_message "星际迷航：信号解码 管理脚本启动 v1.7.3"
+    log_message "星际迷航：信号解码 管理脚本启动 v1.7.4"
     log_message "操作系统: $OS"
     log_message "语言设置: $LANG_SET"
     log_message "----------------------------------------------------"
@@ -690,8 +703,11 @@ main() {
     check_terminal_encoding
 
     while true; do
-        local user_choice=$(show_menu) # 调用菜单并获取用户选择
+        local user_choice=$(show_main_menu) # 调用菜单并获取用户选择
         log_message "User selected: $user_choice"
+        
+        # 清屏，然后执行选择的操作
+        clear
 
         if is_installed; then
             case "$user_choice" in
