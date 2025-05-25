@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 星际迷航：信号解码 游戏管理脚本 v1.7.5
+# 星际迷航：信号解码 游戏管理脚本 v1.7.6
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 
@@ -67,7 +67,7 @@ set_texts() {
         REPAIR_SUCCESS="StarSignalDecoder repaired successfully!"
         REPAIR_FAILED="Repair failed. Possible network issues or missing dependencies. Check the output above and your internet connection." # 更具体
         CLEAN_SUCCESS="Save data and achievements cleaned successfully!"
-        CLEAN_FAILED="Failed to clean save data. Check permissions or try manually."
+        CLEEN_FAILED="Failed to clean save data. Check permissions or try manually."
         UNINSTALL_SUCCESS="StarSignalDecoder uninstalled successfully! Save data also removed."
         UNINSTALL_FAILED="Uninstallation failed. Please check the output above for details."
         PERMISSION_FIX="Attempting to fix save file permissions..."
@@ -85,6 +85,9 @@ set_texts() {
         CHECKING_TERMINAL_ENCODING="Checking terminal encoding..."
         ENCODING_WARNING="Your terminal encoding might not be UTF-8. This can cause display issues. Please set your terminal to UTF-8 (e.g., ${YELLOW}export LANG=en_US.UTF-8${NC} or ${YELLOW}chcp 65001${NC} on Windows)."
         PRESS_ANY_KEY="Press any key to continue..."
+        INVALID_INPUT_EMPTY="Input cannot be empty."
+        INVALID_INPUT_NOT_NUMBER="Please enter a number from the list."
+
     else
         # Chinese Text
         INSTALLATION_MENU="安装与管理菜单"
@@ -133,6 +136,8 @@ set_texts() {
         CHECKING_TERMINAL_ENCODING="正在检查终端编码..."
         ENCODING_WARNING="您的终端编码可能不是 UTF-8。这可能导致显示问题。请将终端设置为 UTF-8（例如 ${YELLOW}export LANG=zh_CN.UTF-8${NC} 或 Windows 上 ${YELLOW}chcp 65001${NC}）。"
         PRESS_ANY_KEY="按任意键继续..."
+        INVALID_INPUT_EMPTY="输入不能为空。"
+        INVALID_INPUT_NOT_NUMBER="请输入列表中的数字。"
     fi
 }
 
@@ -229,7 +234,7 @@ check_python_env() {
     if ! command_exists git; then
         print_warning "${GIT_NOT_FOUND}"
         install_git # 此函数将直接输出到终端
-        if ! command_exists git; then
+        if [ -z "$GIT_CMD" ]; then # Make sure git is found after install_git
             print_error "${INSTALL_FAILED}"
             return 1 # 确保父函数知道安装失败
         fi
@@ -308,7 +313,11 @@ install_pip() {
         if ! "$PYTHON_CMD" -m ensurepip --upgrade; then
             print_error "Failed to ensure pip. Trying direct pip install."
             # Fallback for some systems where ensurepip might struggle
-            curl -s https://bootstrap.pypa.io/get-pip.py | "$PYTHON_CMD" || return 1
+            # We explicitly use /dev/tty for input if piping, as get-pip.py might require it
+            if ! curl -s https://bootstrap.pypa.io/get-pip.py | "$PYTHON_CMD" --stdin; then
+                print_error "Failed to install pip via get-pip.py."
+                return 1
+            fi
         fi
         print_status "Upgrading pip..."
         "$PYTHON_CMD" -m pip install --upgrade pip || return 1
@@ -359,7 +368,7 @@ install_git() {
         print_warning "Unsupported OS for automatic Git installation. Please install Git manually."
         return 1
     fi
-    if ! command_exists git; then
+    if ! command_exists git; then # Final check for git
         print_error "Git installation failed or could not be found in PATH."
         return 1
     fi
@@ -370,8 +379,8 @@ install_git() {
 # 检查 starsignal 命令是否在 PATH 中
 check_path_for_starsignal() {
     if ! command_exists "$GAME_NAME"; then
-        read -r -p "$(echo -e "${YELLOW}${PATH_FIX_PROMPT}${NC}")" -n 1 REPLY
-        echo # 添加换行
+        read -r -p "$(echo -e "${YELLOW}${PATH_FIX_PROMPT}${NC}")" -n 1 REPLY < /dev/tty # Read from TTY
+        echo # Add newline after input
         if [[ "$REPLY" =~ ^[Yy]$ ]]; then # Ensure case-insensitive check
             fix_path
         fi
@@ -537,8 +546,18 @@ do_update_game() {
     fi
 
     local branch
-    read -r -p "$(echo -e "${YELLOW}${CHOOSE_BRANCH}${NC}")" branch
-    branch=${branch:-main} # 默认是 main 分支
+    # read -r -p "$(echo -e "${YELLOW}${CHOOSE_BRANCH}${NC}")" branch < /dev/tty # Read from TTY
+    # 更安全的输入处理
+    local valid_branch=false
+    while ! "$valid_branch"; do
+        read -r -p "$(echo -e "${YELLOW}${CHOOSE_BRANCH}${NC}")" branch < /dev/tty
+        branch=${branch:-main} # Default to main if empty
+        if [[ "$branch" == "main" || "$branch" == "dev" ]]; then
+            valid_branch=true
+        else
+            print_error "${INVALID_INPUT_NOT_NUMBER}" # Use a more generic invalid input message
+        fi
+    done
 
     print_status "${UPDATE_GAME}"
     log_message "开始更新游戏到 $branch 分支..."
@@ -581,8 +600,8 @@ do_repair_game() {
 
 # 清理存档
 do_clean_saves() {
-    read -r -p "$(echo -e "${YELLOW}${CONFIRM_CLEAN}${NC}")" -n 1 REPLY
-    echo # 添加换行
+    read -r -p "$(echo -e "${YELLOW}${CONFIRM_CLEAN}${NC}")" -n 1 REPLY < /dev/tty # Read from TTY
+    echo # Add newline after input
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_status "${CLEAN_SAVES}"
         log_message "开始清理存档和成就数据..."
@@ -595,7 +614,7 @@ do_clean_saves() {
             print_status "${CLEAN_SUCCESS}"
             log_message "${CLEAN_SUCCESS}"
         else
-            print_error "${CLE_FAILED}"
+            print_error "${CLEAN_FAILED}"
             log_message "${CLEAN_FAILED}"
             return 1 # 清理失败
         fi
@@ -609,8 +628,8 @@ do_clean_saves() {
 
 # 卸载游戏
 do_uninstall_game() {
-    read -r -p "$(echo -e "${YELLOW}${CONFIRM_UNINSTALL}${NC}")" -n 1 REPLY
-    echo # 添加换行
+    read -r -p "$(echo -e "${YELLOW}${CONFIRM_UNINSTALL}${NC}")" -n 1 REPLY < /dev/tty # Read from TTY
+    echo # Add newline after input
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_status "${UNINSTALL_GAME}"
         log_message "开始卸载游戏..."
@@ -650,17 +669,17 @@ do_uninstall_game() {
 }
 
 # --- 主菜单 ---
-show_main_menu() {
+show_main_menu_and_get_choice() {
     clear # 清屏以避免旧内容干扰
     if ! "$IS_TERMINAL"; then
         print_warning "${WARNING_PIPE}"
         exit 1
     fi
 
-    local choice_made=false
     local choice=""
+    local valid_choice=false
 
-    while ! "$choice_made"; do
+    while ! "$valid_choice"; do
         echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
         echo -e "${CYAN}║    ${INSTALLATION_MENU}           ${NC}"
         echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
@@ -672,29 +691,37 @@ show_main_menu() {
             echo "3) ${CLEAN_SAVES}"
             echo "4) ${UNINSTALL_GAME}"
             echo "0) ${EXIT_OPTION}"
-        else
+            
+            echo -en "${BLUE}${ENTER_CHOICE}${NC}"
+            read -r choice < /dev/tty # Read from TTY
+            echo # Add newline after input
+            
+            case "$choice" in
+                0|1|2|3|4) valid_choice=true ;;
+                "") print_error "${INVALID_INPUT_EMPTY}" ;;
+                *) print_error "${INVALID_INPUT_NOT_NUMBER}" ;;
+            esac
+        else # Not installed
             echo -e "${YELLOW}${NOT_INSTALLED}${NC}"
             echo "1) ${INSTALL_MAIN}"
             echo "2) ${INSTALL_DEV}"
             echo "0) ${EXIT_OPTION}"
+            
+            echo -en "${BLUE}${ENTER_CHOICE}${NC}"
+            read -r choice < /dev/tty # Read from TTY
+            echo # Add newline after input
+
+            case "$choice" in
+                0|1|2) valid_choice=true ;;
+                "") print_error "${INVALID_INPUT_EMPTY}" ;;
+                *) print_error "${INVALID_INPUT_NOT_NUMBER}" ;;
+            esac
         fi
 
-        echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-        read -r choice # Read user input
-        echo # Add newline after input
-
-        if [ -z "$choice" ]; then
-            print_error "${INVALID_CHOICE} (Input cannot be empty)"
-        elif ! [[ "$choice" =~ ^[0-9]$ ]]; then # Only allow single digit input for now
-            print_error "${INVALID_CHOICE} (Please enter a number from the list)"
-        else
-            choice_made=true
-        fi
-        
-        if ! "$choice_made"; then
+        if ! "$valid_choice"; then
             echo # Add a newline for spacing before re-displaying menu
             echo -e "${CYAN}${PRESS_ANY_KEY}${NC}"
-            read -n 1 -s # Wait for any key to clear and redraw
+            read -n 1 -s < /dev/tty # Wait for any key to clear and redraw, read from TTY
             clear # Clear before redraw
         fi
     done
@@ -713,7 +740,7 @@ main() {
     # 清空并开始记录新的日志会话
     > "$LOG_FILE"
     log_message "----------------------------------------------------"
-    log_message "星际迷航：信号解码 管理脚本启动 v1.7.5"
+    log_message "星际迷航：信号解码 管理脚本启动 v1.7.5" # 实际显示版本是1.7.5，README是1.7.1，会更新README
     log_message "操作系统: $OS"
     log_message "语言设置: $LANG_SET"
     log_message "----------------------------------------------------"
@@ -722,7 +749,7 @@ main() {
     check_terminal_encoding
 
     while true; do
-        local user_choice=$(show_main_menu) # 调用菜单并获取用户选择
+        local user_choice=$(show_main_menu_and_get_choice) # 调用菜单并获取用户选择
         log_message "User selected: $user_choice"
         
         # 清屏，然后执行选择的操作
@@ -748,7 +775,7 @@ main() {
         
         echo # 添加空行，视觉效果
         echo -e "${CYAN}${PRESS_ANY_KEY}${NC}"
-        read -n 1 -s # 等待按键
+        read -n 1 -s < /dev/tty # 等待按键，并从 /dev/tty 读取
         echo # 添加换行
     done
 }
