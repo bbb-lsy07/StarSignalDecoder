@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 REPO_URL="https://github.com/bbb-lsy07/StarSignalDecoder.git"
 GAME_NAME="starsignal"
 DATA_FILE="$HOME/.starsignal_data.json"
-LOG_FILE="$HOME/.starsignal_install.log"
+LOG_FILE="$HOME/.starsignal_manager.log" # 更改日志文件名为 manager.log，仅记录脚本自身运行信息
 SAVE_FILE_PREFIX="$HOME/.starsignal_save_"
 
 # 检查当前是否在终端运行
@@ -61,15 +61,15 @@ set_texts() {
         GIT_NOT_FOUND="Git not found. Installing Git..."
         INSTALLING_GAME="Installing StarSignalDecoder..."
         INSTALL_SUCCESS="StarSignalDecoder installed successfully!"
-        INSTALL_FAILED="Installation failed. Check the log file for details: ${LOG_FILE}"
+        INSTALL_FAILED="Installation failed. Check the output above for details." # 提示看终端输出
         UPDATE_SUCCESS="StarSignalDecoder updated successfully!"
-        UPDATE_FAILED="Update failed. Check the log file for details: ${LOG_FILE}"
+        UPDATE_FAILED="Update failed. Check the output above for details." # 提示看终端输出
         REPAIR_SUCCESS="StarSignalDecoder repaired successfully!"
-        REPAIR_FAILED="Repair failed. Check the log file for details: ${LOG_FILE}"
+        REPAIR_FAILED="Repair failed. Check the output above for details." # 提示看终端输出
         CLEAN_SUCCESS="Save data and achievements cleaned successfully!"
         CLEAN_FAILED="Failed to clean save data. Check permissions."
         UNINSTALL_SUCCESS="StarSignalDecoder uninstalled successfully! Save data also removed."
-        UNINSTALL_FAILED="Uninstallation failed. Check the log file for details: ${LOG_FILE}"
+        UNINSTALL_FAILED="Uninstallation failed. Check the output above for details." # 提示看终端输出
         PERMISSION_FIX="Attempting to fix save file permissions..."
         PERMISSION_SUCCESS="Save file permissions fixed."
         PERMISSION_FAILED="Failed to fix save file permissions. Please fix manually using 'chmod 666 ~/.starsignal*' or 'icacls %USERPROFILE%\.starsignal* /grant Everyone:F'."
@@ -109,15 +109,15 @@ set_texts() {
         GIT_NOT_FOUND="未检测到 Git。正在安装 Git..."
         INSTALLING_GAME="正在安装 星际迷航：信号解码..."
         INSTALL_SUCCESS="星际迷航：信号解码 安装成功！"
-        INSTALL_FAILED="安装失败。请查看日志文件获取详情：${LOG_FILE}"
+        INSTALL_FAILED="安装失败。请查看终端输出获取详情。" # 提示看终端输出
         UPDATE_SUCCESS="星际迷航：信号解码 更新成功！"
-        UPDATE_FAILED="更新失败。请查看日志文件获取详情：${LOG_FILE}"
+        UPDATE_FAILED="更新失败。请查看终端输出获取详情。" # 提示看终端输出
         REPAIR_SUCCESS="星际迷航：信号解码 修复成功！"
-        REPAIR_FAILED="修复失败。请查看日志文件获取详情：${LOG_FILE}"
+        REPAIR_FAILED="修复失败。请查看终端输出获取详情。" # 提示看终端输出
         CLEAN_SUCCESS="存档和成就数据清理成功！"
         CLEAN_FAILED="清理存档失败。请检查文件权限。"
         UNINSTALL_SUCCESS="星际迷航：信号解码 卸载成功！存档数据已移除。"
-        UNINSTALL_FAILED="卸载失败。请查看日志文件获取详情：${LOG_FILE}"
+        UNINSTALL_FAILED="卸载失败。请查看终端输出获取详情。" # 提示看终端输出
         PERMISSION_FIX="正在尝试修复存档文件权限..."
         PERMISSION_SUCCESS="存档文件权限已修复。"
         PERMISSION_FAILED="无法修复存档文件权限。请手动运行：'chmod 666 ~/.starsignal*' (Linux/macOS) 或 'icacls %USERPROFILE%\\.starsignal* /grant Everyone:F' (Windows)。"
@@ -141,20 +141,21 @@ set_texts "$LANG_SET"
 
 # --- 辅助函数 ---
 
+# log_message 函数将输出到终端，并可选择记录到日志文件
 log_message() {
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
 }
 
 print_status() {
-    echo -e "${GREEN}==> $1 ${NC}" | tee -a "$LOG_FILE"
+    echo -e "${GREEN}==> $1 ${NC}" | tee -a "$LOG_FILE" # Status messages still go to log
 }
 
 print_warning() {
-    echo -e "${YELLOW}警告：$1 ${NC}" | tee -a "$LOG_FILE"
+    echo -e "${YELLOW}警告：$1 ${NC}" | tee -a "$LOG_FILE" # Warnings still go to log
 }
 
 print_error() {
-    echo -e "${RED}错误：$1 ${NC}" | tee -a "$LOG_FILE"
+    echo -e "${RED}错误：$1 ${NC}" | tee -a "$LOG_FILE" # Errors still go to log
 }
 
 # 检查命令是否存在
@@ -180,7 +181,6 @@ OS=$(detect_os)
 # 检查 Python 环境
 check_python_env() {
     print_status "${CHECKING_ENV}"
-    log_message "${CHECKING_ENV}"
 
     PYTHON_CMD=""
     if command_exists python3; then
@@ -196,7 +196,7 @@ check_python_env() {
 
     if [ -z "$PYTHON_CMD" ]; then
         print_warning "${PYTHON_NOT_FOUND}"
-        install_python
+        install_python # 此函数将直接输出到终端
         if [ -z "$PYTHON_CMD" ]; then
             print_error "${INSTALL_FAILED}"
             exit 1
@@ -214,7 +214,7 @@ check_python_env() {
 
     if [ -z "$PIP_CMD" ]; then
         print_warning "${PIP_NOT_FOUND}"
-        install_pip
+        install_pip # 此函数将直接输出到终端
         if [ -z "$PIP_CMD" ]; then
             print_error "${INSTALL_FAILED}"
             exit 1
@@ -223,7 +223,7 @@ check_python_env() {
 
     if ! command_exists git; then
         print_warning "${GIT_NOT_FOUND}"
-        install_git
+        install_git # 此函数将直接输出到终端
         if ! command_exists git; then
             print_error "${INSTALL_FAILED}"
             exit 1
@@ -237,27 +237,28 @@ check_python_env() {
 }
 
 install_python() {
-    log_message "尝试安装 Python..."
+    log_message "尝试安装 Python..." # 仅记录开始信息
     if [ "$OS" == "Linux" ]; then
         if command_exists apt-get; then
-            sudo apt-get update >> "$LOG_FILE" 2>&1
-            sudo apt-get install -y python3 python3-dev python3-pip >> "$LOG_FILE" 2>&1
+            sudo apt-get update # 不重定向，实时输出
+            sudo apt-get install -y python3 python3-dev python3-pip # 不重定向，实时输出
         elif command_exists yum; then
-            sudo yum install -y python3 python3-devel python3-pip >> "$LOG_FILE" 2>&1
+            sudo yum install -y python3 python3-devel python3-pip # 不重定向，实时输出
         fi
     elif [ "$OS" == "macOS" ]; then
         if command_exists brew; then
-            brew install python3 >> "$LOG_FILE" 2>&1
+            brew install python3 # 不重定向，实时输出
         else
             print_warning "Homebrew 未安装。请手动安装 Homebrew 并重试。"
         fi
     elif [ "$OS" == "Windows" ]; then
         if command_exists winget; then
-            winget install --id Python.Python.3 --source winget >> "$LOG_FILE" 2>&1
+            winget install --id Python.Python.3 --source winget # 不重定向，实时输出
         else
             print_warning "winget 未安装。请手动从 Python 官网下载安装，并确保勾选 'Add Python to PATH'。"
         fi
     fi
+    # 重新检查 Python 命令是否可用
     if command_exists python3; then
         PYTHON_CMD="python3"
     elif command_exists python; then
@@ -266,45 +267,46 @@ install_python() {
             PYTHON_CMD="python"
         fi
     fi
-    log_message "Python 安装尝试完成。"
+    log_message "Python 安装尝试完成。" # 仅记录结束信息
 }
 
 install_pip() {
-    log_message "尝试安装 pip..."
+    log_message "尝试安装 pip..." # 仅记录开始信息
     if [ -n "$PYTHON_CMD" ]; then
-        "$PYTHON_CMD" -m ensurepip --upgrade >> "$LOG_FILE" 2>&1
-        "$PYTHON_CMD" -m pip install --upgrade pip >> "$LOG_FILE" 2>&1
+        "$PYTHON_CMD" -m ensurepip --upgrade # 不重定向，实时输出
+        "$PYTHON_CMD" -m pip install --upgrade pip # 不重定向，实时输出
     fi
+    # 重新检查 pip 命令是否可用
     if command_exists pip3; then
         PIP_CMD="pip3"
     elif command_exists pip; then
         PIP_CMD="pip"
     fi
-    log_message "pip 安装尝试完成。"
+    log_message "pip 安装尝试完成。" # 仅记录结束信息
 }
 
 install_git() {
-    log_message "尝试安装 Git..."
+    log_message "尝试安装 Git..." # 仅记录开始信息
     if [ "$OS" == "Linux" ]; then
         if command_exists apt-get; then
-            sudo apt-get install -y git >> "$LOG_FILE" 2>&1
+            sudo apt-get install -y git # 不重定向，实时输出
         elif command_exists yum; then
-            sudo yum install -y git >> "$LOG_FILE" 2>&1
+            sudo yum install -y git # 不重定向，实时输出
         fi
     elif [ "$OS" == "macOS" ]; then
         if command_exists brew; then
-            brew install git >> "$LOG_FILE" 2>&1
+            brew install git # 不重定向，实时输出
         else
             print_warning "Homebrew 未安装。请手动安装 Homebrew 并重试。"
         fi
     elif [ "$OS" == "Windows" ]; then
         if command_exists winget; then
-            winget install --id Git.Git --source winget >> "$LOG_FILE" 2>&1
+            winget install --id Git.Git --source winget # 不重定向，实时输出
         else
             print_warning "winget 未安装。请手动从 Git for Windows 官网下载安装。"
         fi
     fi
-    log_message "Git 安装尝试完成。"
+    log_message "Git 安装尝试完成。" # 仅记录结束信息
 }
 
 # 检查 starsignal 命令是否在 PATH 中
@@ -325,8 +327,8 @@ fix_path() {
         if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
             echo "export PATH=\$PATH:$LOCAL_BIN" >> "$HOME/.bashrc"
             echo "export PATH=\$PATH:$LOCAL_BIN" >> "$HOME/.zshrc" # 考虑到 zsh 用户
-            source "$HOME/.bashrc" >> "$LOG_FILE" 2>&1 || true # 尝试立即生效
-            source "$HOME/.zshrc" >> "$LOG_FILE" 2>&1 || true # 尝试立即生效
+            source "$HOME/.bashrc" || true # 尝试立即生效，不重定向错误
+            source "$HOME/.zshrc" || true # 尝试立即生效，不重定向错误
             print_status "${PATH_FIX_LINUX_MAC}"
         else
             print_status "PATH 已包含 $LOCAL_BIN。"
@@ -345,7 +347,7 @@ fix_path() {
         if [ -n "$PYTHON_SCRIPTS_PATH" ] && [ -d "$PYTHON_SCRIPTS_PATH" ]; then
             # 使用 PowerShell 命令来修改用户环境变量，确保路径中的反斜杠被转义
             # 注意：这里需要确保 powershell.exe 可用
-            powershell.exe -Command "$path = [Environment]::GetEnvironmentVariable('Path', 'User'); $newPath = \"$path;${PYTHON_SCRIPTS_PATH//\\/\\\\}\"; [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')" >> "$LOG_FILE" 2>&1
+            powershell.exe -Command "$path = [Environment]::GetEnvironmentVariable('Path', 'User'); $newPath = \"$path;${PYTHON_SCRIPTS_PATH//\\/\\\\}\"; [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')" # 不重定向
             print_status "${PATH_FIX_WINDOWS}"
         else
             print_error "${PATH_FIX_FAILED}"
@@ -378,7 +380,9 @@ check_terminal_encoding() {
     fi
 
     if ! "$encoding_ok"; then
+        echo # 添加换行
         print_warning "${ENCODING_WARNING}"
+        echo # 添加换行
     fi
 }
 
@@ -388,14 +392,21 @@ fix_save_permissions() {
     print_status "${PERMISSION_FIX}"
     log_message "${PERMISSION_FIX}"
     if [ "$OS" == "Linux" ] || [ "$OS" == "macOS" ]; then
-        chmod 666 "${DATA_FILE}" >> "$LOG_FILE" 2>&1 || true
+        # 仅当文件存在时才尝试chmod
+        if [ -f "${DATA_FILE}" ]; then
+            chmod 666 "${DATA_FILE}" || true
+        fi
         for i in {1..3}; do
-            chmod 666 "${SAVE_FILE_PREFIX}${i}.json" >> "$LOG_FILE" 2>&1 || true
+            if [ -f "${SAVE_FILE_PREFIX}${i}.json" ]; then
+                chmod 666 "${SAVE_FILE_PREFIX}${i}.json" || true
+            fi
         done
     elif [ "$OS" == "Windows" ]; then
         # PowerShell 命令来修改 NTFS 权限
+        # 仅当文件存在时才尝试 icacls
+        # 使用 check_file_exists 函数确保文件存在
         # 注意：这里需要确保 powershell.exe 可用
-        powershell.exe -Command "icacls \"$env:USERPROFILE\\.starsignal*\" /grant Everyone:F" >> "$LOG_FILE" 2>&1 || true
+        powershell.exe -Command "If (Test-Path \"$env:USERPROFILE\\.starsignal*\") { icacls \"$env:USERPROFILE\\.starsignal*\" /grant Everyone:F }" || true
     fi
 
     if [ $? -eq 0 ]; then
@@ -422,7 +433,7 @@ install_game() {
 
     print_status "${INSTALLING_GAME}"
     log_message "开始安装游戏到 $branch 分支..."
-    if "$PIP_CMD" install --user "git+${REPO_URL}@${branch}" >> "$LOG_FILE" 2>&1; then
+    if "$PIP_CMD" install --user "git+${REPO_URL}@${branch}"; then # 不再重定向输出
         print_status "${INSTALL_SUCCESS}"
         log_message "${INSTALL_SUCCESS}"
         fix_save_permissions # 尝试修复新安装的权限
@@ -443,7 +454,7 @@ update_game() {
 
     print_status "${UPDATE_GAME}"
     log_message "开始更新游戏到 $branch 分支..."
-    if "$PIP_CMD" install --user --upgrade --force-reinstall "git+${REPO_URL}@${branch}" >> "$LOG_FILE" 2>&1; then
+    if "$PIP_CMD" install --user --upgrade --force-reinstall "git+${REPO_URL}@${branch}"; then # 不再重定向输出
         print_status "${UPDATE_SUCCESS}"
         log_message "${UPDATE_SUCCESS}"
         fix_save_permissions # 尝试修复更新后的权限
@@ -461,7 +472,7 @@ repair_game() {
     print_status "${REPAIR_GAME}"
     log_message "尝试修复游戏安装..."
     # 强制重装以修复可能的文件损坏
-    if "$PIP_CMD" install --user --force-reinstall "git+${REPO_URL}@main" >> "$LOG_FILE" 2>&1; then
+    if "$PIP_CMD" install --user --force-reinstall "git+${REPO_URL}@main"; then # 不再重定向输出
         print_status "${REPAIR_SUCCESS}"
         log_message "${REPAIR_SUCCESS}"
         fix_save_permissions # 修复权限
@@ -478,9 +489,9 @@ clean_saves() {
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_status "${CLEAN_SAVES}"
         log_message "开始清理存档和成就数据..."
-        rm -f "$DATA_FILE" >> "$LOG_FILE" 2>&1 || true
+        rm -f "$DATA_FILE" # 不再重定向
         for i in {1..3}; do
-            rm -f "${SAVE_FILE_PREFIX}${i}.json" >> "$LOG_FILE" 2>&1 || true
+            rm -f "${SAVE_FILE_PREFIX}${i}.json" # 不再重定向
         done
 
         # 检查是否删除成功，如果文件不存在，则认为删除成功
@@ -504,15 +515,15 @@ uninstall_game() {
         print_status "${UNINSTALL_GAME}"
         log_message "开始卸载游戏..."
         if command_exists "$PIP_CMD"; then
-            "$PIP_CMD" uninstall -y "$GAME_NAME" >> "$LOG_FILE" 2>&1
+            "$PIP_CMD" uninstall -y "$GAME_NAME" # 不再重定向输出
         else
             print_warning "pip 命令未找到，可能需要手动删除相关文件。"
         fi
 
         # 移除数据文件和存档文件
-        rm -f "$DATA_FILE" >> "$LOG_FILE" 2>&1 || true
+        rm -f "$DATA_FILE" # 不再重定向
         for i in {1..3}; do
-            rm -f "${SAVE_FILE_PREFIX}${i}.json" >> "$LOG_FILE" 2>&1 || true
+            rm -f "${SAVE_FILE_PREFIX}${i}.json" # 不再重定向
         done
 
         if ! is_installed; then
@@ -561,19 +572,25 @@ show_menu() {
 
     if is_installed; then
         case "$choice" in
-            1) update_game ;;
-            2) repair_game ;;
-            3) clean_saves ;;
-            4) uninstall_game ;;
-            0) exit 0 ;;
-            *) print_error "${INVALID_CHOICE}" ;;
-        esac
-    else
-        case "$choice" in
-            1) install_game main ;;
+            1) install_game main ;; # 修改为直接调用安装/更新/修复函数
             2) install_game dev ;;
-            0) exit 0 ;;
-            *) print_error "${INVALID_CHOICE}" ;;
+            *) # For installed state options
+                if is_installed; then
+                    case "$choice" in
+                        1) update_game ;;
+                        2) repair_game ;;
+                        3) clean_saves ;;
+                        4) uninstall_game ;;
+                        0) exit 0 ;;
+                        *) print_error "${INVALID_CHOICE}" ;;
+                    esac
+                else # For not installed state options
+                    case "$choice" in
+                        0) exit 0 ;;
+                        *) print_error "${INVALID_CHOICE}" ;;
+                    esac
+                fi
+                ;;
         esac
     fi
 }
@@ -587,6 +604,7 @@ main() {
     fi
 
     # 创建日志文件或清空
+    # 注意：这里日志文件仅用于记录脚本自身的关键运行点，不记录安装/更新等命令的详细输出
     > "$LOG_FILE"
     log_message "----------------------------------------------------"
     log_message "星际迷航：信号解码 管理脚本启动 v1.7.2"
