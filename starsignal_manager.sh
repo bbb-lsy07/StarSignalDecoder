@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 星际迷航：信号解码 游戏管理脚本 v1.7.2beta
+# 星际迷航：信号解码 游戏管理脚本 v1.7.3
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 
@@ -61,11 +61,11 @@ set_texts() {
         GIT_NOT_FOUND="Git not found. Attempting to install Git..."
         INSTALLING_GAME="Installing StarSignalDecoder..."
         INSTALL_SUCCESS="StarSignalDecoder installed successfully!"
-        INSTALL_FAILED="Installation failed. Please check the output above for details."
+        INSTALL_FAILED="Installation failed. Possible network issues or missing dependencies. Check the output above and your internet connection." # 更具体
         UPDATE_SUCCESS="StarSignalDecoder updated successfully!"
-        UPDATE_FAILED="Update failed. Please check the output above for details."
+        UPDATE_FAILED="Update failed. Possible network issues or missing dependencies. Check the output above and your internet connection." # 更具体
         REPAIR_SUCCESS="StarSignalDecoder repaired successfully!"
-        REPAIR_FAILED="Repair failed. Please check the output above for details."
+        REPAIR_FAILED="Repair failed. Possible network issues or missing dependencies. Check the output above and your internet connection." # 更具体
         CLEAN_SUCCESS="Save data and achievements cleaned successfully!"
         CLEAN_FAILED="Failed to clean save data. Check permissions or try manually."
         UNINSTALL_SUCCESS="StarSignalDecoder uninstalled successfully! Save data also removed."
@@ -109,11 +109,11 @@ set_texts() {
         GIT_NOT_FOUND="未检测到 Git。正在尝试安装 Git..."
         INSTALLING_GAME="正在安装 星际迷航：信号解码..."
         INSTALL_SUCCESS="星际迷航：信号解码 安装成功！"
-        INSTALL_FAILED="安装失败。请查看终端输出获取详情。"
+        INSTALL_FAILED="安装失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。" # 更具体
         UPDATE_SUCCESS="星际迷航：信号解码 更新成功！"
-        UPDATE_FAILED="更新失败。请查看终端输出获取详情。"
+        UPDATE_FAILED="更新失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。" # 更具体
         REPAIR_SUCCESS="星际迷航：信号解码 修复成功！"
-        REPAIR_FAILED="修复失败。请查看终端输出获取详情。"
+        REPAIR_FAILED="修复失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。" # 更具体
         CLEAN_SUCCESS="存档和成就数据清理成功！"
         CLEAN_FAILED="清理存档失败。请检查文件权限或手动尝试。"
         UNINSTALL_SUCCESS="星际迷航：信号解码 卸载成功！存档数据已移除。"
@@ -146,20 +146,20 @@ log_message() {
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
 }
 
-# print_status/warning/error 函数只输出到终端，不记录到日志文件
+# print_status/warning/error 函数只输出到终端，不记录到日志文件（但会通过log_message记录到日志）
 print_status() {
     echo -e "${GREEN}==> $1 ${NC}"
-    log_message "Status: $1" # 同时记录到日志
+    log_message "Status: $1"
 }
 
 print_warning() {
     echo -e "${YELLOW}警告：$1 ${NC}"
-    log_message "Warning: $1" # 同时记录到日志
+    log_message "Warning: $1"
 }
 
 print_error() {
     echo -e "${RED}错误：$1 ${NC}"
-    log_message "Error: $1" # 同时记录到日志
+    log_message "Error: $1"
 }
 
 # 检查命令是否存在
@@ -192,8 +192,8 @@ check_python_env() {
         PYTHON_CMD="python3"
         print_status "${PYTHON_FOUND}"
     elif command_exists python; then
-        PYTHON_VERSION=$(python -c 'import sys; print(sys.version_info.major)')
-        if [ "$PYTHON_VERSION" -ge 3 ]; then
+        PYTHON_VERSION=$("$PYTHON_CMD" -c 'import sys; print(sys.version_info.major)' 2>/dev/null)
+        if [ -n "$PYTHON_VERSION" ] && [ "$PYTHON_VERSION" -ge 3 ]; then
             PYTHON_CMD="python"
             print_status "${PYTHON_FOUND}"
         fi
@@ -237,7 +237,7 @@ check_python_env() {
         print_status "${GIT_FOUND}"
     fi
 
-    check_path_for_starsignal
+    check_path_for_starsignal # 这里的 PATH 修复提示需要用户输入
     check_terminal_encoding
     return 0 # 环境检查成功
 }
@@ -246,6 +246,7 @@ check_python_env() {
 run_sudo_cmd() {
     local cmd="$1"
     log_message "Executing sudo command: $cmd"
+    echo -e "${CYAN}Running: $cmd ${NC}" # 实时显示正在执行的命令
     if ! eval "$cmd"; then
         print_error "Command failed: $cmd"
         return 1
@@ -254,7 +255,7 @@ run_sudo_cmd() {
 }
 
 install_python() {
-    log_message "尝试安装 Python..." # 仅记录开始信息
+    log_message "尝试安装 Python..."
     if [ "$OS" == "Linux" ]; then
         print_status "Running apt update..."
         run_sudo_cmd "sudo apt-get update" || return 1
@@ -300,7 +301,7 @@ install_python() {
 }
 
 install_pip() {
-    log_message "尝试安装 pip..." # 仅记录开始信息
+    log_message "尝试安装 pip..."
     if [ -n "$PYTHON_CMD" ]; then
         print_status "Ensuring pip is up-to-date..."
         if ! "$PYTHON_CMD" -m ensurepip --upgrade; then
@@ -324,12 +325,12 @@ install_pip() {
         print_error "pip installation failed or could not be found in PATH."
         return 1
     fi
-    log_message "pip 安装尝试完成。" # 仅记录结束信息
+    log_message "pip 安装尝试完成。"
     return 0
 }
 
 install_git() {
-    log_message "尝试安装 Git..." # 仅记录开始信息
+    log_message "尝试安装 Git..."
     if [ "$OS" == "Linux" ]; then
         print_status "Installing Git..."
         run_sudo_cmd "sudo apt-get install -y git" || return 1 # Debian/Ubuntu
@@ -361,7 +362,7 @@ install_git() {
         print_error "Git installation failed or could not be found in PATH."
         return 1
     fi
-    log_message "Git 安装尝试完成。" # 仅记录结束信息
+    log_message "Git 安装尝试完成。"
     return 0
 }
 
@@ -486,7 +487,7 @@ is_installed() {
 # --- 核心功能函数 ---
 
 # 安装游戏
-install_game() {
+do_install_game() {
     local branch=$1
     print_status "${INSTALLING_DEPENDENCIES}"
     # 检查环境，如果环境检查失败，则不继续安装
@@ -506,11 +507,13 @@ install_game() {
     else
         print_error "${INSTALL_FAILED}"
         log_message "${INSTALL_FAILED}"
+        return 1 # 安装失败
     fi
+    return 0 # 安装成功
 }
 
 # 更新游戏
-update_game() {
+do_update_game() {
     print_status "${CHECKING_ENV}"
     if ! check_python_env; then
         print_error "Environment check failed. Cannot proceed with update."
@@ -532,11 +535,13 @@ update_game() {
     else
         print_error "${UPDATE_FAILED}"
         log_message "${UPDATE_FAILED}"
+        return 1 # 更新失败
     fi
+    return 0 # 更新成功
 }
 
 # 修复安装
-repair_game() {
+do_repair_game() {
     print_status "${CHECKING_ENV}"
     if ! check_python_env; then
         print_error "Environment check failed. Cannot proceed with repair."
@@ -554,11 +559,13 @@ repair_game() {
     else
         print_error "${REPAIR_FAILED}"
         log_message "${REPAIR_FAILED}"
+        return 1 # 修复失败
     fi
+    return 0 # 修复成功
 }
 
 # 清理存档
-clean_saves() {
+do_clean_saves() {
     read -r -p "$(echo -e "${YELLOW}${CONFIRM_CLEAN}${NC}")" -n 1 REPLY
     echo # 添加换行
     if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -575,24 +582,30 @@ clean_saves() {
         else
             print_error "${CLEAN_FAILED}"
             log_message "${CLEAN_FAILED}"
+            return 1 # 清理失败
         fi
     else
         print_status "${CANCELLED}"
         log_message "Clean saves cancelled."
+        return 1 # 操作取消
     fi
+    return 0 # 清理成功
 }
 
 # 卸载游戏
-uninstall_game() {
+do_uninstall_game() {
     read -r -p "$(echo -e "${YELLOW}${CONFIRM_UNINSTALL}${NC}")" -n 1 REPLY
     echo # 添加换行
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_status "${UNINSTALL_GAME}"
         log_message "开始卸载游戏..."
         
+        local uninstall_successful=0
         # 尝试卸载游戏
         if command_exists "$PIP_CMD"; then
-            if ! "$PIP_CMD" uninstall -y "$GAME_NAME"; then
+            if "$PIP_CMD" uninstall -y "$GAME_NAME"; then
+                uninstall_successful=1
+            else
                 print_error "Pip uninstall failed. Trying manual file removal."
                 log_message "Pip uninstall failed for $GAME_NAME."
             fi
@@ -611,13 +624,16 @@ uninstall_game() {
         if ! is_installed; then
             print_status "${UNINSTALL_SUCCESS}"
             log_message "${UNINSTALL_SUCCESS}"
+            return 0 # 卸载成功
         else
             print_error "${UNINSTALL_FAILED}"
             log_message "${UNINSTALL_FAILED}"
+            return 1 # 卸载失败
         fi
     else
         print_status "${CANCELLED}"
         log_message "Uninstall cancelled."
+        return 1 # 操作取消
     fi
 }
 
@@ -625,7 +641,8 @@ uninstall_game() {
 show_menu() {
     if ! "$IS_TERMINAL"; then
         print_warning "${WARNING_PIPE}"
-        return
+        # 退出，因为非交互式无法继续
+        exit 1
     fi
 
     echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
@@ -639,34 +656,18 @@ show_menu() {
         echo "3) ${CLEAN_SAVES}"
         echo "4) ${UNINSTALL_GAME}"
         echo "0) ${EXIT_OPTION}"
-        echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-        read -r choice # Read user input
-        echo # Add newline after input
-
-        case "$choice" in
-            1) update_game ;;
-            2) repair_game ;;
-            3) clean_saves ;;
-            4) uninstall_game ;;
-            0) exit 0 ;;
-            *) print_error "${INVALID_CHOICE}" ;;
-        esac
     else
         echo -e "${YELLOW}${NOT_INSTALLED}${NC}"
         echo "1) ${INSTALL_MAIN}"
         echo "2) ${INSTALL_DEV}"
         echo "0) ${EXIT_OPTION}"
-        echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-        read -r choice # Read user input
-        echo # Add newline after input
-
-        case "$choice" in
-            1) install_game main ;;
-            2) install_game dev ;;
-            0) exit 0 ;;
-            *) print_error "${INVALID_CHOICE}" ;;
-        esac
     fi
+
+    echo -en "${BLUE}${ENTER_CHOICE}${NC}"
+    read -r choice # Read user input
+    echo # Add newline after input
+    
+    echo "$choice" # 返回用户选择
 }
 
 # --- 脚本入口点 ---
@@ -680,7 +681,7 @@ main() {
     # 清空并开始记录新的日志会话
     > "$LOG_FILE"
     log_message "----------------------------------------------------"
-    log_message "星际迷航：信号解码 管理脚本启动 v1.7.2"
+    log_message "星际迷航：信号解码 管理脚本启动 v1.7.3"
     log_message "操作系统: $OS"
     log_message "语言设置: $LANG_SET"
     log_message "----------------------------------------------------"
@@ -689,7 +690,27 @@ main() {
     check_terminal_encoding
 
     while true; do
-        show_menu
+        local user_choice=$(show_menu) # 调用菜单并获取用户选择
+        log_message "User selected: $user_choice"
+
+        if is_installed; then
+            case "$user_choice" in
+                1) do_update_game ;;
+                2) do_repair_game ;;
+                3) do_clean_saves ;;
+                4) do_uninstall_game ;;
+                0) exit 0 ;;
+                *) print_error "${INVALID_CHOICE}" ;;
+            esac
+        else
+            case "$user_choice" in
+                1) do_install_game main ;;
+                2) do_install_game dev ;;
+                0) exit 0 ;;
+                *) print_error "${INVALID_CHOICE}" ;;
+            esac
+        fi
+        
         echo # 添加空行，视觉效果
         echo -e "${CYAN}${PRESS_ANY_KEY}${NC}"
         read -n 1 -s # 等待按键
