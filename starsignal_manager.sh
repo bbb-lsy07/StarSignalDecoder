@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# 星际迷航：信号解码 - 全功能管理脚本 v2.0.0
+# 星际迷航：信号解码 - 全功能管理脚本 v2.0.1
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 #
@@ -32,9 +32,9 @@ GAME_NAME="starsignal"
 DATA_FILE="$HOME/.starsignal_data.json"
 LOG_FILE="$HOME/.starsignal_manager.log" # 仅记录脚本自身核心运行信息
 SAVE_FILE_PREFIX="$HOME/.starsignal_save_"
-SCRIPT_VERSION="2.0.0" # 脚本自身版本
+SCRIPT_VERSION="2.0.1" # 脚本自身版本
 
-# 检查当前是否在终端运行
+# 检查当前是否在终端运行 (仅用于警告，不强制)
 IS_TERMINAL=true
 if ! [ -t 0 ]; then
   IS_TERMINAL=false
@@ -48,10 +48,8 @@ if [ "$#" -ge 2 ] && [ "$1" == "--lang" ]; then
 fi
 
 # 文本定义 (根据语言设置)
-# 使用函数来设置变量，以避免 declare -A 的兼容性问题
 set_texts() {
     if [ "$1" == "en" ]; then
-        # English Text
         INSTALLATION_MENU="Star Signal Decoder - Management Menu"
         ALREADY_INSTALLED="StarSignalDecoder is already installed."
         NOT_INSTALLED="StarSignalDecoder is not installed."
@@ -89,7 +87,7 @@ set_texts() {
         PERMISSION_SUCCESS="Save file permissions fixed."
         PERMISSION_FAILED="Failed to fix save file permissions. Please fix manually using 'chmod 666 ~/.starsignal*' or 'icacls %USERPROFILE%\.starsignal* /grant Everyone:F'."
         PATH_FIX_PROMPT="Python scripts directory might not be in your PATH. Do you want to try fixing it? (y/n): "
-        PATH_FIX_LINUX_MAC="Fixing PATH for Linux/macOS. Please source your shell config (e.g., 'source ~/.bashrc') or restart your terminal for changes to take effect."
+        PATH_FIX_LINUX_MACOS="Fixing PATH for Linux/macOS. Please source your shell config (e.g., 'source ~/.bashrc') or restart your terminal for changes to take effect."
         PATH_FIX_WINDOWS="Attempting to fix PATH for Windows. You may need to restart PowerShell/Git Bash or your system for changes to take effect."
         PATH_FIX_FAILED="Failed to fix PATH. Please add Python's Scripts directory to your system's PATH manually."
         WARNING_PIPE="WARNING: This script is designed for interactive use. Running via pipe (e.g., curl ... | sh) may cause input issues. Please download the script and run it locally: ${YELLOW}curl -s ${REPO_URL}/main/starsignal_manager.sh -o starsignal_manager.sh && chmod +x starsignal_manager.sh && ./starsignal_manager.sh${NC}"
@@ -162,8 +160,8 @@ set_texts() {
         PERMISSION_FIX="正在尝试修复存档文件权限..."
         PERMISSION_SUCCESS="存档文件权限已修复。"
         PERMISSION_FAILED="无法修复存档文件权限。请手动运行：'chmod 666 ~/.starsignal*' (Linux/macOS) 或 'icacls %USERPROFILE%\\.starsignal* /grant Everyone:F' (Windows)。"
-        PATH_FIX_PROMPT="Python 脚本目录可能不在您的 PATH 环境变量中。是否尝试修复？(y/n): "
-        PATH_FIX_LINUX_MAC="正在修复 Linux/macOS 的 PATH。请重新加载您的 shell 配置（例如 'source ~/.bashrc'）或重启终端以使更改生效。"
+        PATH_FIX_PROMPT="Python 脚本目录可能不在您的 PATH 环境变量中。是否尝试修复？(y/n)："
+        PATH_FIX_LINUX_MACOS="正在修复 Linux/macOS 的 PATH。请重新加载您的 shell 配置（例如 'source ~/.bashrc'）或重启终端以使更改生效。"
         PATH_FIX_WINDOWS="正在尝试修复 Windows 的 PATH。您可能需要重启 PowerShell/Git Bash 或您的系统以使更改生效。"
         PATH_FIX_FAILED="无法修复 PATH。请手动将 Python 的 Scripts 目录添加到系统 PATH 环境变量中。"
         WARNING_PIPE="警告：本脚本设计为交互式使用。通过管道运行（例如 curl ... | sh）可能导致输入问题。请下载脚本后在本地运行：${YELLOW}curl -s ${REPO_URL}/main/starsignal_manager.sh -o starsignal_manager.sh && chmod +x starsignal_manager.sh && ./starsignal_manager.sh${NC}"
@@ -256,16 +254,26 @@ get_user_input() {
     local choice=""
     local valid_input=false
 
+    # Loop until valid input is received
     while ! "$valid_input"; do
-        echo -en "$prompt" # -n for no newline, -e for escape sequences
+        # Print prompt
+        echo -en "$prompt"
         
-        # Force reading from /dev/tty for interactive input
-        # Adding timeout to prevent complete freezing in non-ideal TTYs
-        if ! read -r -t 60 choice < /dev/tty; then # 60 seconds timeout
-            choice="" # If timeout or read fails, consider choice as empty
+        # Attempt to read from /dev/tty directly for robust interactive input
+        # Use -t 60 for timeout to prevent indefinite hang in non-ideal TTYs
+        # Using read -r -n 1 for single char (y/n) and read -r for full line
+        if [[ "$input_type" == "yes_no" ]]; then
+            if ! read -r -n 1 -t 60 choice < /dev/tty; then
+                choice="" # If timeout or read fails, set choice to empty
+            fi
+        else # For "text" or "menu_choice_*"
+            if ! read -r -t 60 choice < /dev/tty; then
+                choice="" # If timeout or read fails, set choice to empty
+            fi
         fi
-        echo # Always add a newline after input attempt
+        echo # Always add a newline after input attempt (for clarity)
 
+        # Validate input based on type
         case "$input_type" in
             "text")
                 if [ -z "$choice" ]; then
@@ -280,12 +288,12 @@ get_user_input() {
                 elif [ -z "$choice" ]; then
                     print_error "${INVALID_INPUT_EMPTY}"
                 else
-                    print_error "${INVALID_INPUT_NOT_NUMBER}" # Reusing for generic invalid
+                    print_error "${INVALID_INPUT_NOT_NUMBER}" # Generic invalid
                 fi
                 ;;
             "menu_choice_installed")
                 case "$choice" in
-                    0|1|2|3|4|5) valid_input=true ;; # Includes "Start Game" and "Show Manual"
+                    0|1|2|3|4|5|6) valid_input=true ;; # Includes "Start Game" and "Show Manual"
                     "") print_error "${INVALID_INPUT_EMPTY}" ;;
                     *) print_error "${INVALID_INPUT_NOT_NUMBER}" ;;
                 esac
@@ -297,7 +305,7 @@ get_user_input() {
                     *) print_error "${INVALID_INPUT_NOT_NUMBER}" ;;
                 esac
                 ;;
-            *) # Default / fallback for safety
+            *) # Fallback for safety
                 if [ -z "$choice" ]; then
                     print_error "${INVALID_INPUT_EMPTY}"
                 else
@@ -306,12 +314,14 @@ get_user_input() {
                 ;;
         esac
 
+        # If input is not valid, prompt user to press Enter and clear screen to retry
         if ! "$valid_input"; then
-            echo # Add a newline for spacing before re-displaying menu
-            echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" # Prompt to press enter
-            read -r -s -t 60 < /dev/tty # Wait for ENTER (silent), add timeout
-            echo # Add newline
-            clear # Clear screen after invalid input and user acknowledgement
+            echo # Newline for spacing
+            echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}"
+            # Wait for Enter, silent, read from /dev/tty
+            read -r -s -t 60 < /dev/tty
+            echo # Newline
+            clear # Clear screen before re-displaying prompt
         fi
     done
     echo "$choice" # Return the valid input
@@ -460,7 +470,7 @@ fix_path() {
             echo "export PATH=\$PATH:$LOCAL_BIN" >> "$HOME/.zshrc"
             source "$HOME/.bashrc" >/dev/null 2>&1 || true
             source "$HOME/.zshrc" >/dev/null 2>&1 || true
-            print_status "${PATH_FIX_LINUX_MAC}"
+            print_status "${PATH_FIX_LINUX_MACOS}"
             log_message "PATH fixed for Linux/macOS. Added $LOCAL_BIN to bashrc/zshrc."
         else
             print_status "PATH 已包含 $LOCAL_BIN。"
@@ -468,7 +478,6 @@ fix_path() {
         fi
     elif [ "$OS" == "Windows" ]; then
         print_warning "Windows PATH fixing is complex. Please refer to manual instructions if automatic fix fails."
-        # Attempt to get Python Scripts path (user-site or system-wide)
         PYTHON_SCRIPTS_PATH=""
         if [ -n "$PYTHON_CMD" ]; then
             PYTHON_SCRIPTS_PATH=$("$PYTHON_CMD" -c "import site; print(site.USER_BASE + '/Scripts')" 2>/dev/null)
@@ -478,7 +487,6 @@ fix_path() {
         fi
 
         if [ -n "$PYTHON_SCRIPTS_PATH" ] && [ -d "$PYTHON_SCRIPTS_PATH" ]; then
-            # PowerShell command to modify user environment variable
             powershell.exe -Command "[Environment]::SetEnvironmentVariable('Path', ([Environment]::GetEnvironmentVariable('Path', 'User') + ';${PYTHON_SCRIPTS_PATH//\\/\\\\}'), 'User')" >/dev/null 2>&1
             if [ $? -eq 0 ]; then
                 print_status "${PATH_FIX_WINDOWS}"
@@ -526,7 +534,6 @@ fix_save_permissions() {
     print_status "${PERMISSION_FIX}"
     log_message "${PERMISSION_FIX}"
     if [ "$OS" == "Linux" ] || [ "$OS" == "macOS" ]; then
-        # 仅当文件存在时才尝试chmod
         if [ -f "${DATA_FILE}" ]; then
             chmod 666 "${DATA_FILE}" || log_message "Failed chmod on $DATA_FILE"
         fi
@@ -543,7 +550,6 @@ fix_save_permissions() {
             log_message "${PERMISSION_FAILED}"
         fi
     elif [ "$OS" == "Windows" ]; then
-        # Check if files exist before trying to modify permissions
         local data_file_exists=$(powershell.exe -Command "Test-Path \"$env:USERPROFILE\\.starsignal_data.json\"" 2>/dev/null)
         local save_files_exist=$(powershell.exe -Command "Test-Path \"$env:USERPROFILE\\.starsignal_save_*.json\"" 2>/dev/null)
 
@@ -756,7 +762,9 @@ do_start_game() {
     if command_exists starsignal; then
         # 提示用户如果遇到交互问题如何处理
         print_warning "${GAME_START_NOTE}"
-        starsignal ${game_options}
+        # 直接运行游戏，并确保标准输入/输出/错误与TTY连接
+        # 使用exec将当前shell替换为游戏进程，或直接运行并管理其IO
+        starsignal ${game_options} < /dev/tty > /dev/tty 2>&1
         if [ $? -ne 0 ]; then
             print_error "游戏运行出错。请检查上述错误信息，或尝试解决终端兼容性问题。"
             log_message "Game exited with error status."
@@ -815,16 +823,16 @@ do_show_manual_guide() {
 
 # --- 主菜单 ---
 show_main_menu_and_get_choice() {
-    clear # 清屏以避免旧内容干扰
-    if ! "$IS_TERMINAL"; then
-        print_warning "${WARNING_PIPE}"
-        exit 1
-    fi
-
     local choice=""
     local valid_choice=false
 
     while ! "$valid_choice"; do
+        clear # Clear screen before each menu display
+        if ! "$IS_TERMINAL"; then
+            print_warning "${WARNING_PIPE}"
+            exit 1
+        fi
+
         echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
         echo -e "${CYAN}║    ${INSTALLATION_MENU}           ${NC}"
         echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
@@ -842,7 +850,7 @@ show_main_menu_and_get_choice() {
             choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_installed")
             
             case "$choice" in
-                0|1|2|3|4|5|6) valid_choice=true ;; # All valid options for installed state
+                0|1|2|3|4|5|6) valid_choice=true ;;
                 *) print_error "${INVALID_CHOICE}" ;;
             esac
         else # Not installed
@@ -855,15 +863,15 @@ show_main_menu_and_get_choice() {
             choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_not_installed")
 
             case "$choice" in
-                0|1|2|3) valid_choice=true ;; # All valid options for not installed state
+                0|1|2|3) valid_choice=true ;;
                 *) print_error "${INVALID_CHOICE}" ;;
             esac
         fi
 
         if ! "$valid_choice"; then
-            echo # Add a newline for spacing before re-displaying menu
-            # get_user_input already handles "Press Enter to continue..." for invalid inputs
-            : # No extra prompt needed here.
+            # Error message is already printed by get_user_input
+            # get_user_input also handles "Press Enter to continue" and clears screen
+            : # No extra prompt needed here, get_user_input manages loop and display.
         fi
     done
     
@@ -893,7 +901,7 @@ main() {
         local user_choice=$(show_main_menu_and_get_choice) # 调用菜单并获取用户选择
         log_message "User selected: $user_choice"
         
-        # 清屏，然后执行选择的操作
+        # Clear screen before executing action
         clear
 
         if is_installed; then
@@ -902,8 +910,8 @@ main() {
                 2) do_repair_game ;;
                 3) do_clean_saves ;;
                 4) do_uninstall_game ;;
-                5) do_start_game ;; # 新增启动游戏
-                6) do_show_manual_guide ;; # 新增显示手动指南
+                5) do_start_game ;;
+                6) do_show_manual_guide ;;
                 0) exit 0 ;;
                 *) print_error "${INVALID_CHOICE}" ;;
             esac
@@ -911,15 +919,16 @@ main() {
             case "$user_choice" in
                 1) do_install_game main ;;
                 2) do_install_game dev ;;
-                3) do_show_manual_guide ;; # 新增显示手动指南
+                3) do_show_manual_guide ;;
                 0) exit 0 ;;
                 *) print_error "${INVALID_CHOICE}" ;;
             esac
         fi
         
-        echo # 添加空行，视觉效果
-        echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" # Consistent prompt
-        read -r -s < /dev/tty # 等待按键，并从 /dev/tty 读取
+        # After executing a function, pause and clear screen before next menu loop
+        echo # Add empty line for spacing
+        echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}"
+        read -r -s < /dev/tty # Wait for Enter, read from /dev/tty
         echo # Add newline
     done
 }
