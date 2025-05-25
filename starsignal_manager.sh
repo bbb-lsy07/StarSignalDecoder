@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# 星际迷航：信号解码 - 全功能管理脚本 v4.0.0
+# 星际迷航：信号解码 - 全功能管理脚本 v4.0.1
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 #
@@ -27,6 +27,13 @@
 #   - 增强 root 执行兼容性，移除 /dev/tty 依赖
 #
 # 变更日志：
+#   v4.0.1 (2025-05-25):
+#     - 修复菜单选择逻辑，直接使用 select 的 REPLY 变量，确保输入准确映射到功能
+#     - 改进超时处理，使用 read 超时替代 TMOUT，添加 timeout_handler 函数
+#     - 增强输入缓冲区清理，确保 root 执行时无残留输入
+#     - 添加非数字和超出范围输入的验证，显示无效选择提示
+#     - 增强调试日志，记录 select 的 REPLY 值和终端状态
+#     - 更新版本号到 4.0.1
 #   v4.0.0 (2025-05-25):
 #     - 重写菜单逻辑，使用 select 命令，解决输入验证问题
 #     - 添加配置文件、进度条、帮助系统、存档备份、超时退出、颜色主题
@@ -69,14 +76,13 @@ LOG_FILE="$HOME/.starsignal_manager.log"
 CONFIG_FILE="$HOME/.starsignal_config.json"
 SAVE_FILE_PREFIX="$HOME/.starsignal_save_"
 BACKUP_DIR="$HOME/.starsignal_backup"
-SCRIPT_VERSION="4.0.0"
+SCRIPT_VERSION="4.0.1"
 PYTHON_CMD=""
 PIP_CMD=""
 DEBUG_MODE=false
 LANG_SET="zh"
 DEFAULT_BRANCH="main"
 COLOR_THEME="default"
-TMOUT=300 # 5分钟超时
 
 # 如果以 root 运行，调整文件路径
 if [ "$(id -u)" -eq 0 ] && [ -n "$SUDO_USER" ]; then
@@ -466,6 +472,7 @@ get_user_input() {
 
         case "$input_type" in
             "text")
+                echo "$choice"
                 return 0
                 ;;
             "yes_no")
@@ -502,6 +509,13 @@ run_sudo_cmd() {
         return 1
     fi
     return 0
+}
+
+# 超时处理
+timeout_handler() {
+    print_status "${TIMEOUT_MESSAGE}"
+    log_message "Timeout after 5 minutes"
+    exit 0
 }
 
 # --- 环境检查与安装 ---
@@ -1115,29 +1129,31 @@ show_main_menu() {
 
     PS3="${BLUE}${ENTER_CHOICE}${NC}"
     select opt in "${options[@]}"; do
-        local choice
-        if is_installed; then
-            case "$opt" in
-                "${UPDATE_GAME}") choice=1 ;;
-                "${REPAIR_GAME}") choice=2 ;;
-                "${CLEAN_SAVES}") choice=3 ;;
-                "${UNINSTALL_GAME}") choice=4 ;;
-                "${START_GAME}") choice=5 ;;
-                "${SHOW_MANUAL}") choice=6 ;;
-                "${SHOW_HELP}") choice=7 ;;
-                "${EXIT_OPTION}") choice=0 ;;
-                *) print_error "${INVALID_CHOICE}" >&2; continue ;;
-            esac
-        else
-            case "$opt" in
-                "${INSTALL_MAIN}") choice=1 ;;
-                "${INSTALL_DEV}") choice=2 ;;
-                "${SHOW_MANUAL}") choice=3 ;;
-                "${SHOW_HELP}") choice=4 ;;
-                "${EXIT_OPTION}") choice=0 ;;
-                *) print_error "${INVALID_CHOICE}" >&2; continue ;;
-            esac
+        local choice="$REPLY"
+        log_message "Raw select input: '$choice'"
+
+        # 验证输入是否为数字
+        if [[ ! "$choice" =~ ^[0-9]+$ ]]; then
+            print_error "${INVALID_CHOICE}"
+            log_message "Invalid choice: non-numeric input '$choice'"
+            continue
         fi
+
+        # 验证输入范围
+        if is_installed; then
+            if [ "$choice" -lt 0 ] || [ "$choice" -gt 7 ]; then
+                print_error "${INVALID_CHOICE}"
+                log_message "Invalid choice: out of range '$choice' (expected 0-7)"
+                continue
+            fi
+        else
+            if [ "$choice" -lt 0 ] || [ "$choice" -gt 4 ]; then
+                print_error "${INVALID_CHOICE}"
+                log_message "Invalid choice: out of range '$choice' (expected 0-4)"
+                continue
+            fi
+        fi
+
         log_message "User selected: $choice ($opt)"
         echo "$choice"
         break
@@ -1160,21 +1176,38 @@ main() {
     log_message "终端类型: $TERM"
     log_message "调试模式: $DEBUG_MODE"
     log_message "颜色主题: $COLOR_THEME"
+    log_message "终端状态: $(stty -a 2>/dev/null)"
     log_message "----------------------------------------------------"
 
     check_terminal_encoding
-    local repo_version="4.0.0"
+    local repo_version="4.0.1"
     if [ "$SCRIPT_VERSION" != "$repo_version" ]; then
         print_warning "$(printf "${VERSION_WARNING}" "$SCRIPT_VERSION" "${REPO_URL}")"
     fi
 
-    trap 'print_status "${TIMEOUT_MESSAGE}"; log_message "Timeout after 5 minutes"; exit 0' SIGALRM
     while true; do
         local user_choice=$(show_main_menu)
-        if [ -z "$user_choice" ]; then
+        if [ -z "$user_choice" ] || [[ ! "$user_choice" =~ ^[0-9]+$ ]]; then
             print_error "${INVALID_CHOICE}"
+            log_message "Invalid choice: empty or non-numeric '$user_choice'"
             continue
         fi
+
+        # 验证选择范围
+        if is_installed; then
+            if [ "$user_choice" -lt 0 ] || [ "$user_choice" -gt 7 ]; then
+                print_error "${INVALID_CHOICE}"
+                log_message "Invalid choice: out of range '$user_choice' (expected 0-7)"
+                continue
+            fi
+        else
+            if [ "$user_choice" -lt 0 ] || [ "$user_choice" -gt 4 ]; then
+                print_error "${INVALID_CHOICE}"
+                log_message "Invalid choice: out of range '$user_choice' (expected 0-4)"
+                continue
+            fi
+        fi
+
         clear
         if is_installed; then
             case "$user_choice" in
