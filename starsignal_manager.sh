@@ -141,21 +141,22 @@ set_texts "$LANG_SET"
 
 # --- 辅助函数 ---
 
-# log_message 函数将输出到终端，并可选择记录到日志文件
+# log_message 函数将输出到终端，并记录到日志文件
 log_message() {
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
 }
 
+# print_status/warning/error 函数只输出到终端，不记录到日志文件
 print_status() {
-    echo -e "${GREEN}==> $1 ${NC}" | tee -a "$LOG_FILE" # Status messages still go to log
+    echo -e "${GREEN}==> $1 ${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}警告：$1 ${NC}" | tee -a "$LOG_FILE" # Warnings still go to log
+    echo -e "${YELLOW}警告：$1 ${NC}"
 }
 
 print_error() {
-    echo -e "${RED}错误：$1 ${NC}" | tee -a "$LOG_FILE" # Errors still go to log
+    echo -e "${RED}错误：$1 ${NC}"
 }
 
 # 检查命令是否存在
@@ -181,6 +182,7 @@ OS=$(detect_os)
 # 检查 Python 环境
 check_python_env() {
     print_status "${CHECKING_ENV}"
+    log_message "${CHECKING_ENV}"
 
     PYTHON_CMD=""
     if command_exists python3; then
@@ -404,7 +406,6 @@ fix_save_permissions() {
     elif [ "$OS" == "Windows" ]; then
         # PowerShell 命令来修改 NTFS 权限
         # 仅当文件存在时才尝试 icacls
-        # 使用 check_file_exists 函数确保文件存在
         # 注意：这里需要确保 powershell.exe 可用
         powershell.exe -Command "If (Test-Path \"$env:USERPROFILE\\.starsignal*\") { icacls \"$env:USERPROFILE\\.starsignal*\" /grant Everyone:F }" || true
     fi
@@ -433,7 +434,8 @@ install_game() {
 
     print_status "${INSTALLING_GAME}"
     log_message "开始安装游戏到 $branch 分支..."
-    if "$PIP_CMD" install --user "git+${REPO_URL}@${branch}"; then # 不再重定向输出
+    # pip install 命令的输出将直接显示在终端
+    if "$PIP_CMD" install --user "git+${REPO_URL}@${branch}"; then
         print_status "${INSTALL_SUCCESS}"
         log_message "${INSTALL_SUCCESS}"
         fix_save_permissions # 尝试修复新安装的权限
@@ -449,12 +451,15 @@ update_game() {
     check_python_env
 
     local branch
-    read -p "$(echo -e "${YELLOW}${CHOOSE_BRANCH}${NC}")" branch
+    # 使用 -r 确保读取原始内容，防止转义，使用 -p 提示
+    # bash的read命令在交互式shell中会等待用户输入
+    read -r -p "$(echo -e "${YELLOW}${CHOOSE_BRANCH}${NC}")" branch
     branch=${branch:-main} # 默认是 main 分支
 
     print_status "${UPDATE_GAME}"
     log_message "开始更新游戏到 $branch 分支..."
-    if "$PIP_CMD" install --user --upgrade --force-reinstall "git+${REPO_URL}@${branch}"; then # 不再重定向输出
+    # pip install 命令的输出将直接显示在终端
+    if "$PIP_CMD" install --user --upgrade --force-reinstall "git+${REPO_URL}@${branch}"; then
         print_status "${UPDATE_SUCCESS}"
         log_message "${UPDATE_SUCCESS}"
         fix_save_permissions # 尝试修复更新后的权限
@@ -484,7 +489,7 @@ repair_game() {
 
 # 清理存档
 clean_saves() {
-    read -p "$(echo -e "${YELLOW}${CONFIRM_CLEAN}${NC}")" -n 1 -r REPLY
+    read -r -p "$(echo -e "${YELLOW}${CONFIRM_CLEAN}${NC}")" -n 1 REPLY
     echo # 添加换行
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_status "${CLEAN_SAVES}"
@@ -509,7 +514,7 @@ clean_saves() {
 
 # 卸载游戏
 uninstall_game() {
-    read -p "$(echo -e "${YELLOW}${CONFIRM_UNINSTALL}${NC}")" -n 1 -r REPLY
+    read -r -p "$(echo -e "${YELLOW}${CONFIRM_UNINSTALL}${NC}")" -n 1 REPLY
     echo # 添加换行
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_status "${UNINSTALL_GAME}"
@@ -556,41 +561,32 @@ show_menu() {
         echo "3) ${CLEAN_SAVES}"
         echo "4) ${UNINSTALL_GAME}"
         echo "0) ${EXIT_OPTION}"
+        echo -en "${BLUE}${ENTER_CHOICE}${NC}"
+        read -r choice || true # Read user input
+        echo # Add newline after input
+
+        case "$choice" in
+            1) update_game ;;
+            2) repair_game ;;
+            3) clean_saves ;;
+            4) uninstall_game ;;
+            0) exit 0 ;;
+            *) print_error "${INVALID_CHOICE}" ;;
+        esac
     else
         echo -e "${YELLOW}${NOT_INSTALLED}${NC}"
         echo "1) ${INSTALL_MAIN}"
         echo "2) ${INSTALL_DEV}"
         echo "0) ${EXIT_OPTION}"
-    fi
+        echo -en "${BLUE}${ENTER_CHOICE}${NC}"
+        read -r choice || true # Read user input
+        echo # Add newline after input
 
-    echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-    # 使用 -e 选项确保 readline 模式，允许方向键等
-    # 使用 -r 避免反斜杠转义
-    # 强制等待输入，避免空行直接回车
-    read -r choice || true # Add || true to prevent script exiting on CTRL+D
-    echo # 添加换行
-
-    if is_installed; then
         case "$choice" in
-            1) install_game main ;; # 修改为直接调用安装/更新/修复函数
+            1) install_game main ;;
             2) install_game dev ;;
-            *) # For installed state options
-                if is_installed; then
-                    case "$choice" in
-                        1) update_game ;;
-                        2) repair_game ;;
-                        3) clean_saves ;;
-                        4) uninstall_game ;;
-                        0) exit 0 ;;
-                        *) print_error "${INVALID_CHOICE}" ;;
-                    esac
-                else # For not installed state options
-                    case "$choice" in
-                        0) exit 0 ;;
-                        *) print_error "${INVALID_CHOICE}" ;;
-                    esac
-                fi
-                ;;
+            0) exit 0 ;;
+            *) print_error "${INVALID_CHOICE}" ;;
         esac
     fi
 }
@@ -617,6 +613,7 @@ main() {
 
     while true; do
         show_menu
+        echo # 添加空行，视觉效果
         echo -e "${CYAN}${PRESS_ANY_KEY}${NC}"
         read -n 1 -s # 等待按键
         echo # 添加换行
