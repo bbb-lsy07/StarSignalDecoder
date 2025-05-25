@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 星际迷航：信号解码 游戏管理脚本 v1.7.5
+# 星际迷航：信号解码 游戏管理脚本 v1.7.7
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 
@@ -61,11 +61,11 @@ set_texts() {
         GIT_NOT_FOUND="Git not found. Attempting to install Git..."
         INSTALLING_GAME="Installing StarSignalDecoder..."
         INSTALL_SUCCESS="StarSignalDecoder installed successfully!"
-        INSTALL_FAILED="Installation failed. Possible network issues or missing dependencies. Check the output above and your internet connection." # 更具体
+        INSTALL_FAILED="Installation failed. Possible network issues, missing dependencies, or outdated pip. Check the output above, your internet, and consider updating pip." # 更具体
         UPDATE_SUCCESS="StarSignalDecoder updated successfully!"
-        UPDATE_FAILED="Update failed. Possible network issues or missing dependencies. Check the output above and your internet connection." # 更具体
+        UPDATE_FAILED="Update failed. Possible network issues, missing dependencies, or outdated pip. Check the output above and your internet connection." # 更具体
         REPAIR_SUCCESS="StarSignalDecoder repaired successfully!"
-        REPAIR_FAILED="Repair failed. Possible network issues or missing dependencies. Check the output above and your internet connection." # 更具体
+        REPAIR_FAILED="Repair failed. Possible network issues, missing dependencies, or outdated pip. Check the output above and your internet connection." # 更具体
         CLEAN_SUCCESS="Save data and achievements cleaned successfully!"
         CLEAN_FAILED="Failed to clean save data. Check permissions or try manually."
         UNINSTALL_SUCCESS="StarSignalDecoder uninstalled successfully! Save data also removed."
@@ -84,7 +84,7 @@ set_texts() {
         CHOOSE_BRANCH="Choose branch (main/dev) [main]: "
         CHECKING_TERMINAL_ENCODING="Checking terminal encoding..."
         ENCODING_WARNING="Your terminal encoding might not be UTF-8. This can cause display issues. Please set your terminal to UTF-8 (e.g., ${YELLOW}export LANG=en_US.UTF-8${NC} or ${YELLOW}chcp 65001${NC} on Windows)."
-        PRESS_ANY_KEY="Press any key to continue..."
+        PRESS_ENTER_TO_CONTINUE="Press Enter to continue..."
         INVALID_INPUT_EMPTY="Input cannot be empty."
         INVALID_INPUT_NOT_NUMBER="Please enter a number from the list."
 
@@ -112,11 +112,11 @@ set_texts() {
         GIT_NOT_FOUND="未检测到 Git。正在尝试安装 Git..."
         INSTALLING_GAME="正在安装 星际迷航：信号解码..."
         INSTALL_SUCCESS="星际迷航：信号解码 安装成功！"
-        INSTALL_FAILED="安装失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。"
+        INSTALL_FAILED="安装失败。可能存在网络问题、依赖缺失或 pip 版本过旧。请检查终端输出、您的互联网连接，并考虑更新 pip。"
         UPDATE_SUCCESS="星际迷航：信号解码 更新成功！"
-        UPDATE_FAILED="更新失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。"
+        UPDATE_FAILED="更新失败。可能存在网络问题、依赖缺失或 pip 版本过旧。请检查终端输出和您的互联网连接。"
         REPAIR_SUCCESS="星际迷航：信号解码 修复成功！"
-        REPAIR_FAILED="修复失败。可能存在网络问题或依赖缺失。请检查终端输出和您的互联网连接。"
+        REPAIR_FAILED="修复失败。可能存在网络问题、依赖缺失或 pip 版本过旧。请检查终端输出和您的互联网连接。"
         CLEAN_SUCCESS="存档和成就数据清理成功！"
         CLEAN_FAILED="清理存档失败。请检查文件权限或手动尝试。"
         UNINSTALL_SUCCESS="星际迷航：信号解码 卸载成功！存档数据已移除。"
@@ -135,7 +135,7 @@ set_texts() {
         CHOOSE_BRANCH="选择分支 (main/dev) [main]: "
         CHECKING_TERMINAL_ENCODING="正在检查终端编码..."
         ENCODING_WARNING="您的终端编码可能不是 UTF-8。这可能导致显示问题。请将终端设置为 UTF-8（例如 ${YELLOW}export LANG=zh_CN.UTF-8${NC} 或 Windows 上 ${YELLOW}chcp 65001${NC}）。"
-        PRESS_ANY_KEY="按任意键继续..."
+        PRESS_ENTER_TO_CONTINUE="按回车键继续..."
         INVALID_INPUT_EMPTY="输入不能为空。"
         INVALID_INPUT_NOT_NUMBER="请输入列表中的数字。"
     fi
@@ -187,77 +187,61 @@ detect_os() {
 
 OS=$(detect_os)
 
-# 检查 Python 环境
-check_python_env() {
-    print_status "${CHECKING_ENV}"
-    log_message "${CHECKING_ENV}"
+# 通用的用户输入函数，确保在任何环境下都能交互
+# 参数1: 提示信息
+# 参数2: 可选，如果为 "yes_no"，则期待 y/n
+# 返回值: 用户输入的内容
+get_user_input() {
+    local prompt="$1"
+    local input_type="$2"
+    local choice=""
+    local valid_input=false
 
-    PYTHON_CMD=""
-    if command_exists python3; then
-        PYTHON_CMD="python3"
-        print_status "${PYTHON_FOUND}"
-    elif command_exists python; then
-        PYTHON_VERSION=$("$PYTHON_CMD" -c 'import sys; print(sys.version_info.major)' 2>/dev/null)
-        if [ -n "$PYTHON_VERSION" ] && [ "$PYTHON_VERSION" -ge 3 ]; then
-            PYTHON_CMD="python"
-            print_status "${PYTHON_FOUND}"
+    # 尝试从 /dev/tty 读取，更具鲁棒性
+    while ! "$valid_input"; do
+        echo -en "$prompt"
+        # 使用 read -r 确保不转义反斜杠， -t 超时以防万一卡死， -n 1 只读一个字符（如果需要）
+        # 对于多字符输入，不使用 -n
+        if [[ "$input_type" == "yes_no" ]]; then
+            read -r -n 1 -t 60 choice < /dev/tty
+        else
+            read -r -t 60 choice < /dev/tty
         fi
-    fi
+        echo # 添加换行
 
-    if [ -z "$PYTHON_CMD" ]; then
-        print_warning "${PYTHON_NOT_FOUND}"
-        install_python # 此函数将直接输出到终端
-        if [ -z "$PYTHON_CMD" ]; then
-            print_error "${INSTALL_FAILED}"
-            return 1 # 确保父函数知道安装失败
+        if [ -z "$choice" ]; then
+            if [[ "$input_type" == "yes_no" ]]; then
+                 # 对于y/n，如果为空，可以给默认值或者继续循环
+                 print_error "${INVALID_INPUT_EMPTY}"
+            else
+                print_error "${INVALID_INPUT_EMPTY}"
+            fi
+        else
+            if [[ "$input_type" == "yes_no" ]]; then
+                if [[ "$choice" =~ ^[YyNn]$ ]]; then
+                    valid_input=true
+                else
+                    print_error "${INVALID_INPUT_NOT_NUMBER}" # Reuse for generic invalid
+                fi
+            elif [[ "$input_type" == "menu_choice" ]]; then
+                 if [[ "$choice" =~ ^[0-9]$ ]]; then # For single digit menu options
+                    valid_input=true
+                else
+                    print_error "${INVALID_INPUT_NOT_NUMBER}"
+                fi
+            else # Generic text input
+                valid_input=true
+            fi
         fi
-    fi
 
-    PIP_CMD=""
-    if command_exists pip3; then
-        PIP_CMD="pip3"
-        print_status "${PIP_FOUND}"
-    elif command_exists pip; then
-        PIP_CMD="pip"
-        print_status "${PIP_FOUND}"
-    fi
-
-    if [ -z "$PIP_CMD" ]; then
-        print_warning "${PIP_NOT_FOUND}"
-        install_pip # 此函数将直接输出到终端
-        if [ -z "$PIP_CMD" ]; then
-            print_error "${INSTALL_FAILED}"
-            return 1 # 确保父函数知道安装失败
+        if ! "$valid_input"; then
+            echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" # Prompt to press enter
+            read -r -s < /dev/tty # Wait for ENTER
+            echo # Add newline
+            clear # Clear screen after invalid input and user acknowledgement
         fi
-    fi
-
-    if ! command_exists git; then
-        print_warning "${GIT_NOT_FOUND}"
-        install_git # 此函数将直接输出到终端
-        if [ -z "$GIT_CMD" ]; then # Make sure git is found after install_git
-            print_error "${INSTALL_FAILED}"
-            return 1 # 确保父函数知道安装失败
-        fi
-    else
-        print_status "${GIT_FOUND}"
-    fi
-
-    # 这里的 PATH 修复提示需要用户输入，在安装或更新前执行
-    check_path_for_starsignal
-    check_terminal_encoding
-    return 0 # 环境检查成功
-}
-
-# 辅助函数：执行需要sudo的命令
-run_sudo_cmd() {
-    local cmd="$1"
-    log_message "Executing sudo command: $cmd"
-    echo -e "${CYAN}Running: $cmd ${NC}" # 实时显示正在执行的命令
-    if ! eval "$cmd"; then
-        print_error "Command failed: $cmd"
-        return 1
-    fi
-    return 0
+    done
+    echo "$choice" # Return the valid input
 }
 
 install_python() {
@@ -379,9 +363,8 @@ install_git() {
 # 检查 starsignal 命令是否在 PATH 中
 check_path_for_starsignal() {
     if ! command_exists "$GAME_NAME"; then
-        read -r -p "$(echo -e "${YELLOW}${PATH_FIX_PROMPT}${NC}")" -n 1 REPLY < /dev/tty # Read from TTY
-        echo # Add newline after input
-        if [[ "$REPLY" =~ ^[Yy]$ ]]; then # Ensure case-insensitive check
+        local reply_val=$(get_user_input "${YELLOW}${PATH_FIX_PROMPT}${NC}" "yes_no")
+        if [[ "$reply_val" =~ ^[Yy]$ ]]; then # Ensure case-insensitive check
             fix_path
         fi
     fi
@@ -478,7 +461,6 @@ fix_save_permissions() {
             log_message "${PERMISSION_FAILED}"
         fi
     elif [ "$OS" == "Windows" ]; then
-        # Check if files exist before trying to modify permissions
         local data_file_exists=$(powershell.exe -Command "Test-Path \"$env:USERPROFILE\\.starsignal_data.json\"" 2>/dev/null)
         local save_files_exist=$(powershell.exe -Command "Test-Path \"$env:USERPROFILE\\.starsignal_save_*.json\"" 2>/dev/null)
 
@@ -488,7 +470,6 @@ fix_save_permissions() {
                 success=1
             fi
         else
-            # If no files exist, it's implicitly successful as there's nothing to fix.
             success=1
         fi
 
@@ -505,7 +486,7 @@ fix_save_permissions() {
 
 # 检查游戏是否已安装
 is_installed() {
-    command -v "$GAME_NAME"
+    command_exists "$GAME_NAME"
 }
 
 # --- 核心功能函数 (do_*) ---
@@ -514,7 +495,6 @@ is_installed() {
 do_install_game() {
     local branch=$1
     print_status "${INSTALLING_DEPENDENCIES}"
-    # 检查环境，如果环境检查失败，则不继续安装
     if ! check_python_env; then
         print_error "Environment check failed. Installation aborted."
         log_message "Environment check failed. Installation aborted."
@@ -523,7 +503,6 @@ do_install_game() {
 
     print_status "${INSTALLING_GAME}"
     log_message "开始安装游戏到 $branch 分支..."
-    # pip install 命令的输出将直接显示在终端
     if "$PIP_CMD" install --user "git+${REPO_URL}@${branch}"; then
         print_status "${INSTALL_SUCCESS}"
         log_message "${INSTALL_SUCCESS}"
@@ -545,21 +524,11 @@ do_update_game() {
         return 1
     fi
 
-    local branch
-    local valid_branch=false
-    while ! "$valid_branch"; do
-        read -r -p "$(echo -e "${YELLOW}${CHOOSE_BRANCH}${NC}")" branch < /dev/tty
-        branch=${branch:-main} # Default to main if empty
-        if [[ "$branch" == "main" || "$branch" == "dev" ]]; then
-            valid_branch=true
-        else
-            print_error "${INVALID_INPUT_NOT_NUMBER}" # Use a more generic invalid input message
-        fi
-    done
+    local branch=$(get_user_input "${YELLOW}${CHOOSE_BRANCH}${NC}" "text")
+    branch=${branch:-main} # Default to main if empty
 
     print_status "${UPDATE_GAME}"
     log_message "开始更新游戏到 $branch 分支..."
-    # pip install 命令的输出将直接显示在终端
     if "$PIP_CMD" install --user --upgrade --force-reinstall "git+${REPO_URL}@${branch}"; then
         print_status "${UPDATE_SUCCESS}"
         log_message "${UPDATE_SUCCESS}"
@@ -583,7 +552,6 @@ do_repair_game() {
 
     print_status "${REPAIR_GAME}"
     log_message "尝试修复游戏安装..."
-    # 强制重装以修复可能的文件损坏
     if "$PIP_CMD" install --user --force-reinstall "git+${REPO_URL}@main"; then
         print_status "${REPAIR_SUCCESS}"
         log_message "${REPAIR_SUCCESS}"
@@ -598,9 +566,8 @@ do_repair_game() {
 
 # 清理存档
 do_clean_saves() {
-    read -r -p "$(echo -e "${YELLOW}${CONFIRM_CLEAN}${NC}")" -n 1 REPLY < /dev/tty # Read from TTY
-    echo # Add newline after input
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    local reply_val=$(get_user_input "${YELLOW}${CONFIRM_CLEAN}${NC}" "yes_no")
+    if [[ "$reply_val" =~ ^[Yy]$ ]]; then
         print_status "${CLEAN_SAVES}"
         log_message "开始清理存档和成就数据..."
         rm -f "$DATA_FILE"
@@ -626,9 +593,8 @@ do_clean_saves() {
 
 # 卸载游戏
 do_uninstall_game() {
-    read -r -p "$(echo -e "${YELLOW}${CONFIRM_UNINSTALL}${NC}")" -n 1 REPLY < /dev/tty # Read from TTY
-    echo # Add newline after input
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    local reply_val=$(get_user_input "${YELLOW}${CONFIRM_UNINSTALL}${NC}" "yes_no")
+    if [[ "$reply_val" =~ ^[Yy]$ ]]; then
         print_status "${UNINSTALL_GAME}"
         log_message "开始卸载游戏..."
         
@@ -690,18 +656,11 @@ show_main_menu_and_get_choice() {
             echo "4) ${UNINSTALL_GAME}"
             echo "0) ${EXIT_OPTION}"
             
-            echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-            # 强制从 /dev/tty 读取，即使 stdin 被重定向
-            # 增加 `-t` 超时选项，如果用户没有输入，则在短时间后认为无效输入，避免脚本完全卡住
-            if ! read -r -t 60 choice < /dev/tty; then # 60秒超时，如果没输入就自动判断为空
-                choice="" # If timeout or read fails, set choice to empty
-            fi
-            echo # Add newline after input
+            choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_installed") # Use custom input function
             
             case "$choice" in
                 0|1|2|3|4) valid_choice=true ;;
-                "") print_error "${INVALID_INPUT_EMPTY}" ;;
-                *) print_error "${INVALID_INPUT_NOT_NUMBER}" ;;
+                *) print_error "${INVALID_CHOICE}" ;; # get_user_input handles specific invalid messages
             esac
         else # Not installed
             echo -e "${YELLOW}${NOT_INSTALLED}${NC}"
@@ -709,24 +668,19 @@ show_main_menu_and_get_choice() {
             echo "2) ${INSTALL_DEV}"
             echo "0) ${EXIT_OPTION}"
             
-            echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-            if ! read -r -t 60 choice < /dev/tty; then # 60秒超时
-                choice=""
-            fi
-            echo # Add newline after input
+            choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_not_installed") # Use custom input function
 
             case "$choice" in
                 0|1|2) valid_choice=true ;;
-                "") print_error "${INVALID_INPUT_EMPTY}" ;;
-                *) print_error "${INVALID_INPUT_NOT_NUMBER}" ;;
+                *) print_error "${INVALID_CHOICE}" ;; # get_user_input handles specific invalid messages
             esac
         fi
 
         if ! "$valid_choice"; then
             echo # Add a newline for spacing before re-displaying menu
-            echo -e "${CYAN}${PRESS_ANY_KEY}${NC}"
-            read -n 1 -s < /dev/tty # Wait for any key to clear and redraw, read from TTY
-            clear # Clear before redraw
+            # "Press any key to continue..." has been replaced with "Press Enter to continue..." in get_user_input
+            # The clear and re-display loop is now fully managed within this function
+            : # No need for extra "Press any key" prompt here as get_user_input already prompts.
         fi
     done
     
@@ -778,9 +732,9 @@ main() {
         fi
         
         echo # 添加空行，视觉效果
-        echo -e "${CYAN}${PRESS_ANY_KEY}${NC}"
-        read -n 1 -s < /dev/tty # 等待按键，并从 /dev/tty 读取
-        echo # 添加换行
+        echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" # Consistent prompt
+        read -r -s < /dev/tty # Wait for Enter, and from /dev/tty
+        echo # Add newline
     done
 }
 
