@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# 星际迷航：信号解码 - 全功能管理脚本 v3.0.0
+# 星际迷航：信号解码 - 全功能管理脚本 v3.5.0
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 #
@@ -32,7 +32,9 @@ GAME_NAME="starsignal"
 DATA_FILE="$HOME/.starsignal_data.json"
 LOG_FILE="$HOME/.starsignal_manager.log" # 仅记录脚本自身核心运行信息
 SAVE_FILE_PREFIX="$HOME/.starsignal_save_"
-SCRIPT_VERSION="3.0.0" # 脚本自身版本
+SCRIPT_VERSION="3.5.0" # 脚本自身版本
+PYTHON_CMD=""
+PIP_CMD=""
 
 # 如果以 root 运行，尝试使用 SUDO_USER 的家目录
 if [ "$(id -u)" -eq 0 ] && [ -n "$SUDO_USER" ]; then
@@ -107,6 +109,7 @@ set_texts() {
         PRESS_ENTER_TO_CONTINUE="Press Enter to continue..."
         INVALID_INPUT_EMPTY="Input cannot be empty."
         INVALID_INPUT_NOT_NUMBER="Please enter a number from the list."
+        INVALID_YES_NO="Please enter Y or N."
         GAME_START_OPTIONS="Enter game start options (e.g., --difficulty hard --tutorial): "
         GAME_START_NOTE="If game input seems stuck, try running in a native terminal, or use 'stty sane' and 'export TERM=xterm-256color'."
         MANUAL_INSTALL_HEADER="【Manual Installation Guide】"
@@ -128,6 +131,7 @@ set_texts() {
         MANUAL_INSTALL_DEV_VERSION="pip3 install --user git+${REPO_URL}@dev (Linux/macOS) / pip install --user git+${REPO_URL}@dev (Windows)"
         MANUAL_INSTALL_COLORAMA="pip3 install --user colorama (recommended for color output)"
         MANUAL_INSTALL_RUN_GAME="Run Game: starsignal"
+        VERSION_WARNING="Warning: Script version (%s) may be outdated. Please check %s for updates."
     else
         # Chinese Text
         INSTALLATION_MENU="星际迷航：信号解码 - 管理菜单"
@@ -180,6 +184,7 @@ set_texts() {
         PRESS_ENTER_TO_CONTINUE="按回车键继续..."
         INVALID_INPUT_EMPTY="输入不能为空。"
         INVALID_INPUT_NOT_NUMBER="请输入列表中的数字。"
+        INVALID_YES_NO="请输入 Y 或 N。"
         GAME_START_OPTIONS="请输入游戏启动选项（例如 --difficulty hard --tutorial）："
         GAME_START_NOTE="提示：如果游戏输入卡顿，请尝试在本地终端运行，或尝试运行 'stty sane' 和 'export TERM=xterm-256color'。"
         MANUAL_INSTALL_HEADER="【手动安装指南】"
@@ -201,6 +206,7 @@ set_texts() {
         MANUAL_INSTALL_DEV_VERSION="pip3 install --user git+${REPO_URL}@dev (Linux/macOS) / pip install --user git+${REPO_URL}@dev (Windows)"
         MANUAL_INSTALL_COLORAMA="pip3 install --user colorama (推荐用于彩色输出)"
         MANUAL_INSTALL_RUN_GAME="运行游戏：starsignal"
+        VERSION_WARNING="警告：脚本版本 (%s) 可能已过时。请访问 %s 检查更新。"
     fi
 }
 
@@ -209,24 +215,30 @@ set_texts "$LANG_SET"
 
 # --- 辅助函数 ---
 
-# log_message 函数将输出到终端，并记录到日志文件
+# log_message 函数将输出到日志文件（不包含颜色代码）
 log_message() {
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
+    local message="$1"
+    # 移除颜色代码后记录到日志
+    local clean_message=$(echo "$message" | sed 's/\x1b\[[0-9;]*m//g')
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $clean_message" >> "$LOG_FILE" 2>/dev/null || {
+        echo "Error: Cannot write to log file $LOG_FILE. Check permissions." >&2
+        exit 1
+    }
 }
 
 # print_status/warning/error 函数只输出到终端，不记录到日志文件（但会通过log_message记录到日志）
 print_status() {
-    echo -e "${GREEN}==> $1 ${NC}" >&2
+    printf "${GREEN}==> %s ${NC}\n" "$1" >&2
     log_message "Status: $1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}警告：$1 ${NC}" >&2
+    printf "${YELLOW}警告：%s ${NC}\n" "$1" >&2
     log_message "Warning: $1"
 }
 
 print_error() {
-    echo -e "${RED}错误：$1 ${NC}" >&2
+    printf "${RED}错误：%s ${NC}\n" "$1" >&2
     log_message "Error: $1"
 }
 
@@ -264,15 +276,14 @@ get_user_input() {
 
     while ! "$valid_input" && [ "$attempt" -lt "$max_attempts" ]; do
         # Print prompt and force flush
-        echo -en "$prompt" >&2
-        sync # Ensure prompt is displayed immediately
+        printf "%b" "$prompt" >&2
         
         # Try reading from /dev/tty first
         if [[ -r /dev/tty ]]; then
             if [[ "$input_type" == "yes_no" ]]; then
-                read -r -n 1 -t 30 choice < /dev/tty 2>/dev/null
+                read -r -n 1 -t 30 choice < /dev/tty 2>/dev/null || read -r -n 1 -t 30 choice
             else
-                read -r -t 30 choice < /dev/tty 2>/dev/null
+                read -r -t 30 choice < /dev/tty 2>/dev/null || read -r -t 30 choice
             fi
         else
             # Fallback to standard input
@@ -282,17 +293,22 @@ get_user_input() {
                 read -r -t 30 choice 2>/dev/null
             fi
         fi
-        echo # Add newline after input
+        
+        # Trim whitespace and handle newlines
+        choice=$(echo "$choice" | tr -d '[:space:]')
+        
+        # Add newline after yes/no input
+        if [[ "$input_type" == "yes_no" ]]; then
+            echo >&2
+        fi
+        
         log_message "Input attempt $((attempt + 1)): Received '$choice' for type '$input_type'"
 
         # Validate input based on type
         case "$input_type" in
             "text")
-                if [ -z "$choice" ]; then
-                    print_error "${INVALID_INPUT_EMPTY}"
-                else
-                    valid_input=true
-                fi
+                # Allow empty input for text type (e.g., game options can be empty)
+                valid_input=true
                 ;;
             "yes_no")
                 if [[ "$choice" =~ ^[YyNn]$ ]]; then
@@ -300,7 +316,7 @@ get_user_input() {
                 elif [ -z "$choice" ]; then
                     print_error "${INVALID_INPUT_EMPTY}"
                 else
-                    print_error "${INVALID_INPUT_NOT_NUMBER}"
+                    print_error "${INVALID_YES_NO}"
                 fi
                 ;;
             "menu_choice_installed")
@@ -322,11 +338,7 @@ get_user_input() {
                 fi
                 ;;
             *)
-                if [ -z "$choice" ]; then
-                    print_error "${INVALID_INPUT_EMPTY}"
-                else
-                    valid_input=true
-                fi
+                valid_input=true
                 ;;
         esac
 
@@ -337,7 +349,7 @@ get_user_input() {
                 log_message "Maximum input attempts reached. Exiting input loop."
                 exit 1
             fi
-            echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" >&2
+            printf "${CYAN}%s${NC}\n" "${PRESS_ENTER_TO_CONTINUE}" >&2
             read -r -s -t 30 2>/dev/null || true
             clear
         fi
@@ -349,7 +361,7 @@ get_user_input() {
 run_sudo_cmd() {
     local cmd="$1"
     log_message "Executing sudo command: $cmd"
-    echo -e "${CYAN}Running: $cmd ${NC}" >&2
+    printf "${CYAN}Running: %s ${NC}\n" "$cmd" >&2
     if ! eval "$cmd"; then
         print_error "Command failed: $cmd"
         return 1
@@ -358,13 +370,55 @@ run_sudo_cmd() {
 }
 
 # --- 环境检查与安装 ---
+
+# 检查并设置 Python 命令
+check_python() {
+    if command_exists python3; then
+        PYTHON_CMD="python3"
+        print_status "${PYTHON_FOUND}"
+        return 0
+    elif command_exists python; then
+        local version=$(python -c 'import sys; print(sys.version_info.major)' 2>/dev/null)
+        if [ "$version" == "3" ]; then
+            PYTHON_CMD="python"
+            print_status "${PYTHON_FOUND}"
+            return 0
+        fi
+    fi
+    print_warning "${PYTHON_NOT_FOUND}"
+    return 1
+}
+
+# 检查并设置 pip 命令
+check_pip() {
+    if command_exists pip3; then
+        PIP_CMD="pip3"
+        print_status "${PIP_FOUND}"
+        return 0
+    elif command_exists pip; then
+        PIP_CMD="pip"
+        print_status "${PIP_FOUND}"
+        return 0
+    fi
+    print_warning "${PIP_NOT_FOUND}"
+    return 1
+}
+
 install_python() {
     log_message "尝试安装 Python..."
     if [ "$OS" == "Linux" ]; then
         print_status "Running apt update..."
-        run_sudo_cmd "sudo apt-get update" || return 1
-        print_status "Installing python3, python3-dev, python3-pip..."
-        run_sudo_cmd "sudo apt-get install -y python3 python3-dev python3-pip" || return 1
+        if command_exists apt-get; then
+            run_sudo_cmd "sudo apt-get update" || return 1
+            print_status "Installing python3, python3-dev, python3-pip..."
+            run_sudo_cmd "sudo apt-get install -y python3 python3-dev python3-pip" || return 1
+        elif command_exists yum; then
+            print_status "Installing python3, python3-devel, python3-pip..."
+            run_sudo_cmd "sudo yum install -y python3 python3-devel python3-pip" || return 1
+        else
+            print_error "Unsupported package manager"
+            return 1
+        fi
     elif [ "$OS" == "macOS" ]; then
         if command_exists brew; then
             print_status "Installing python3 via Homebrew..."
@@ -382,27 +436,17 @@ install_python() {
     fi
 
     # 重新检查 Python 命令是否可用
-    if command_exists python3; then
-        PYTHON_CMD="python3"
-    elif command_exists python; then
-        PYTHON_VERSION=$("$PYTHON_CMD" -c 'import sys; print(sys.version_info.major)' 2>/dev/null)
-        if [ -n "$PYTHON_VERSION" ] && [ "$PYTHON_VERSION" -ge 3 ]; then
-            PYTHON_CMD="python"
-        fi
-    fi
-    if [ -z "$PYTHON_CMD" ]; then
-        print_error "Python installation failed or could not be found in PATH."
-        return 1
-    fi
+    check_python
+    local result=$?
     log_message "Python 安装尝试完成。"
-    return 0
+    return $result
 }
 
 install_pip() {
     log_message "尝试安装 pip..."
     if [ -n "$PYTHON_CMD" ]; then
         print_status "Ensuring pip is up-to-date..."
-        if ! "$PYTHON_CMD" -m ensurepip --upgrade; then
+        if ! "$PYTHON_CMD" -m ensurepip --upgrade 2>/dev/null; then
             print_warning "Failed to ensure pip via ensurepip. Trying direct get-pip.py install."
             if ! curl -s https://bootstrap.pypa.io/get-pip.py | "$PYTHON_CMD"; then
                 print_error "Failed to install pip via get-pip.py."
@@ -415,32 +459,26 @@ install_pip() {
         print_error "Python command not found, cannot install pip."
         return 1
     fi
+    
     # 重新检查 pip 命令是否可用
-    if command_exists pip3; then
-        PIP_CMD="pip3"
-    elif command_exists pip; then
-        PIP_CMD="pip"
-    fi
-    if [ -z "$PIP_CMD" ]; then
-        print_error "pip installation failed or could not be found in PATH."
-        return 1
-    fi
+    check_pip
+    local result=$?
     log_message "pip 安装尝试完成。"
-    return 0
+    return $result
 }
 
 install_git() {
     log_message "尝试安装 Git..."
     if [ "$OS" == "Linux" ]; then
         print_status "Installing Git..."
-        run_sudo_cmd "sudo apt-get install -y git" || {
-            if [ $? -ne 0 ] && command_exists yum; then
-                run_sudo_cmd "sudo yum install -y git" || return 1
-            else
-                print_error "Failed to install Git. Unsupported Linux package manager or installation error."
-                return 1
-            fi
-        }
+        if command_exists apt-get; then
+            run_sudo_cmd "sudo apt-get install -y git" || return 1
+        elif command_exists yum; then
+            run_sudo_cmd "sudo yum install -y git" || return 1
+        else
+            print_error "Failed to install Git. Unsupported Linux package manager."
+            return 1
+        fi
     elif [ "$OS" == "macOS" ]; then
         if command_exists brew; then
             print_status "Installing Git via Homebrew..."
@@ -480,10 +518,13 @@ fix_path() {
     if [ "$OS" == "Linux" ] || [ "$OS" == "macOS" ]; then
         LOCAL_BIN="$HOME/.local/bin"
         if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
+            # 检查文件是否存在，如果不存在则创建
+            touch "$HOME/.bashrc" 2>/dev/null || true
+            touch "$HOME/.zshrc" 2>/dev/null || true
+            
             echo "export PATH=\$PATH:$LOCAL_BIN" >> "$HOME/.bashrc"
             echo "export PATH=\$PATH:$LOCAL_BIN" >> "$HOME/.zshrc"
-            source "$HOME/.bashrc" >/dev/null 2>&1 || true
-            source "$HOME/.zshrc" >/dev/null 2>&1 || true
+            export PATH="$PATH:$LOCAL_BIN"
             print_status "${PATH_FIX_LINUX_MACOS}"
             log_message "PATH fixed for Linux/macOS. Added $LOCAL_BIN to bashrc/zshrc."
         else
@@ -494,14 +535,16 @@ fix_path() {
         print_warning "Windows PATH fixing is complex. Please refer to manual instructions if automatic fix fails."
         PYTHON_SCRIPTS_PATH=""
         if [ -n "$PYTHON_CMD" ]; then
-            PYTHON_SCRIPTS_PATH=$("$PYTHON_CMD" -c "import site; print(site.USER_BASE + '/Scripts')" 2>/dev/null)
+            PYTHON_SCRIPTS_PATH=$("$PYTHON_CMD" -c "import site; print(site.USER_BASE + '\\\\Scripts')" 2>/dev/null | tr '\\' '/')
             if [ -z "$PYTHON_SCRIPTS_PATH" ] || [ ! -d "$PYTHON_SCRIPTS_PATH" ]; then
-                PYTHON_SCRIPTS_PATH=$("$PYTHON_CMD" -c "import sys; print(sys.prefix + '/Scripts')" 2>/dev/null)
+                PYTHON_SCRIPTS_PATH=$("$PYTHON_CMD" -c "import sys; print(sys.prefix + '\\\\Scripts')" 2>/dev/null | tr '\\' '/')
             fi
         fi
 
         if [ -n "$PYTHON_SCRIPTS_PATH" ] && [ -d "$PYTHON_SCRIPTS_PATH" ]; then
-            powershell.exe -Command "[Environment]::SetEnvironmentVariable('Path', ([Environment]::GetEnvironmentVariable('Path', 'User') + ';${PYTHON_SCRIPTS_PATH//\\/\\\\}'), 'User')" >/dev/null 2>&1
+            # Convert forward slashes to backslashes for Windows
+            PYTHON_SCRIPTS_PATH_WIN=$(echo "$PYTHON_SCRIPTS_PATH" | tr '/' '\\')
+            powershell.exe -Command "[Environment]::SetEnvironmentVariable('Path', ([Environment]::GetEnvironmentVariable('Path', 'User') + ';${PYTHON_SCRIPTS_PATH_WIN}'), 'User')" >/dev/null 2>&1
             if [ $? -eq 0 ]; then
                 print_status "${PATH_FIX_WINDOWS}"
                 log_message "PATH fixed for Windows. Added $PYTHON_SCRIPTS_PATH to user PATH."
@@ -523,12 +566,12 @@ check_terminal_encoding() {
     
     if [ "$OS" == "Linux" ] || [ "$OS" == "macOS" ]; then
         local current_lang=$(locale | grep -E 'LC_CTYPE|LANG' | head -n 1 | cut -d'=' -f2 | tr -d '"' | cut -d'.' -f2 | tr '[:lower:]' '[:upper:]')
-        if [[ "$current_lang" != "UTF-8" ]]; then
+        if [[ "$current_lang" != "UTF-8" && "$current_lang" != "UTF8" ]]; then
             encoding_ok=false
         fi
     elif [ "$OS" == "Windows" ]; then
-        local current_lang_windows=$(echo $LANG | cut -d'.' -f2 | tr '[:lower:]' '[:upper:]')
-        if [ -z "$current_lang_windows" ] || [[ "$current_lang_windows" != "UTF-8" ]]; then
+        local current_lang_windows=$(echo "$LANG" | cut -d'.' -f2 | tr '[:lower:]' '[:upper:]')
+        if [ -z "$current_lang_windows" ] || [[ "$current_lang_windows" != "UTF-8" && "$current_lang_windows" != "UTF8" ]]; then
             local chcp_output=$(chcp 2>/dev/null | grep -oE '[0-9]+')
             if [[ "$chcp_output" != "65001" ]]; then
                 encoding_ok=false
@@ -537,9 +580,9 @@ check_terminal_encoding() {
     fi
 
     if ! "$encoding_ok"; then
-        echo
+        echo >&2
         print_warning "${ENCODING_WARNING}"
-        echo
+        echo >&2
     fi
 }
 
@@ -547,16 +590,19 @@ check_terminal_encoding() {
 fix_save_permissions() {
     print_status "${PERMISSION_FIX}"
     log_message "${PERMISSION_FIX}"
+    local permission_errors=0
+    
     if [ "$OS" == "Linux" ] || [ "$OS" == "macOS" ]; then
         if [ -f "${DATA_FILE}" ]; then
-            chmod 666 "${DATA_FILE}" || log_message "Failed chmod on $DATA_FILE"
+            chmod 666 "${DATA_FILE}" || { log_message "Failed chmod on $DATA_FILE"; ((permission_errors++)); }
         fi
         for i in {1..3}; do
             if [ -f "${SAVE_FILE_PREFIX}${i}.json" ]; then
-                chmod 666 "${SAVE_FILE_PREFIX}${i}.json" || log_message "Failed chmod on ${SAVE_FILE_PREFIX}${i}.json"
+                chmod 666 "${SAVE_FILE_PREFIX}${i}.json" || { log_message "Failed chmod on ${SAVE_FILE_PREFIX}${i}.json"; ((permission_errors++)); }
             fi
         done
-        if [ $? -eq 0 ]; then
+        
+        if [ $permission_errors -eq 0 ]; then
             print_status "${PERMISSION_SUCCESS}"
             log_message "${PERMISSION_SUCCESS}"
         else
@@ -595,20 +641,33 @@ is_installed() {
 
 # 执行环境检查与安装依赖
 run_environment_setup() {
-    print_status "${INSTALLING_DEPENDENCIES}"
-    if ! install_python; then
-        print_error "Python installation/check failed. Cannot proceed."
-        return 1
+    print_status "${CHECKING_ENV}"
+    
+    # 检查 Python
+    if ! check_python; then
+        if ! install_python; then
+            print_error "Python installation/check failed. Cannot proceed."
+            return 1
+        fi
     fi
 
-    if ! install_pip; then
-        print_error "pip installation/check failed. Cannot proceed."
-        return 1
+    # 检查 pip
+    if ! check_pip; then
+        if ! install_pip; then
+            print_error "pip installation/check failed. Cannot proceed."
+            return 1
+        fi
     fi
 
-    if ! install_git; then
-        print_error "Git installation/check failed. Cannot proceed."
-        return 1
+    # 检查 Git
+    if ! command_exists git; then
+        print_warning "${GIT_NOT_FOUND}"
+        if ! install_git; then
+            print_error "Git installation/check failed. Cannot proceed."
+            return 1
+        fi
+    else
+        print_status "${GIT_FOUND}"
     fi
 
     check_path_for_starsignal
@@ -770,7 +829,8 @@ do_start_game() {
     
     if command_exists starsignal; then
         print_warning "${GAME_START_NOTE}"
-        starsignal ${game_options} < /dev/tty > /dev/tty 2>&1
+        # 使用 eval 确保选项正确传递
+        eval "starsignal ${game_options}" < /dev/tty > /dev/tty 2>&1
         if [ $? -ne 0 ]; then
             print_error "游戏运行出错。请检查上述错误信息，或尝试解决终端兼容性问题。"
             log_message "Game exited with error status."
@@ -787,42 +847,42 @@ do_start_game() {
 # 显示手动安装指南函数
 do_show_manual_guide() {
     clear
-    echo -e "${CYAN}=================================================================="
-    echo "${MANUAL_INSTALL_HEADER}"
-    echo "==================================================================${NC}"
-    echo ""
-    echo -e "${GREEN}${MANUAL_INSTALL_REQUIREMENTS}${NC}"
-    echo "- ${MANUAL_INSTALL_PYTHON_PIP}"
-    echo "- ${MANUAL_INSTALL_GIT}"
-    echo ""
-    echo -e "${GREEN}${MANUAL_INSTALL_LINUX_MACOS_STEPS}${NC}"
-    echo "1. 安装 Python 3.6+ 和 pip："
-    echo "   ${MANUAL_INSTALL_PYTHON_LINUX}"
-    echo "2. 安装 Git："
-    echo "   ${MANUAL_INSTALL_GIT_LINUX}"
-    echo "3. 确保 pip 和 PATH 正确："
-    echo "   ${MANUAL_INSTALL_PIP_PATH}"
-    echo ""
-    echo -e "${GREEN}${MANUAL_INSTALL_WINDOWS_STEPS}${NC}"
-    echo "1. 安装 Python 3.6+ 和 pip："
-    echo "   ${MANUAL_INSTALL_WINDOWS_PYTHON}"
-    echo "2. 安装 Git for Windows："
-    echo "   ${MANUAL_INSTALL_WINDOWS_GIT}"
-    echo "3. 手动添加 PATH (如果 'starsignal' 命令无法找到)："
-    echo "   ${MANUAL_INSTALL_WINDOWS_PATH}"
-    echo ""
-    echo -e "${GREEN}${MANUAL_INSTALL_GAME_CORE}${NC}"
-    echo "1. 安装游戏核心（稳定版）："
-    echo "   ${MANUAL_INSTALL_STABLE_VERSION}"
-    echo "2. 安装游戏核心（开发版）："
-    echo "   ${MANUAL_INSTALL_DEV_VERSION}"
-    echo "3. 安装彩色输出支持（推荐）："
-    echo "   ${MANUAL_INSTALL_COLORAMA}"
-    echo ""
-    echo -e "${GREEN}${MANUAL_INSTALL_RUN_GAME}${NC}"
-    echo ""
-    echo -e "${CYAN}==================================================================${NC}"
-    echo ""
+    printf "${CYAN}==================================================================\n" >&2
+    printf "%s\n" "${MANUAL_INSTALL_HEADER}" >&2
+    printf "==================================================================${NC}\n" >&2
+    echo >&2
+    printf "${GREEN}%s${NC}\n" "${MANUAL_INSTALL_REQUIREMENTS}" >&2
+    printf "- %s\n" "${MANUAL_INSTALL_PYTHON_PIP}" >&2
+    printf "- %s\n" "${MANUAL_INSTALL_GIT}" >&2
+    echo >&2
+    printf "${GREEN}%s${NC}\n" "${MANUAL_INSTALL_LINUX_MACOS_STEPS}" >&2
+    printf "1. 安装 Python 3.6+ 和 pip：\n" >&2
+    printf "   %s\n" "${MANUAL_INSTALL_PYTHON_LINUX}" >&2
+    printf "2. 安装 Git：\n" >&2
+    printf "   %s\n" "${MANUAL_INSTALL_GIT_LINUX}" >&2
+    printf "3. 确保 pip 和 PATH 正确：\n" >&2
+    printf "   %s\n" "${MANUAL_INSTALL_PIP_PATH}" >&2
+    echo >&2
+    printf "${GREEN}%s${NC}\n" "${MANUAL_INSTALL_WINDOWS_STEPS}" >&2
+    printf "1. 安装 Python 3.6+ 和 pip：\n" >&2
+    printf "   %s\n" "${MANUAL_INSTALL_WINDOWS_PYTHON}" >&2
+    printf "2. 安装 Git for Windows：\n" >&2
+    printf "   %s\n" "${MANUAL_INSTALL_WINDOWS_GIT}" >&2
+    printf "3. 手动添加 PATH (如果 'starsignal' 命令无法找到)：\n" >&2
+    printf "   %s\n" "${MANUAL_INSTALL_WINDOWS_PATH}" >&2
+    echo >&2
+    printf "${GREEN}%s${NC}\n" "${MANUAL_INSTALL_GAME_CORE}" >&2
+    printf "1. 安装游戏核心（稳定版）：\n" >&2
+    printf "   %s\n" "${MANUAL_INSTALL_STABLE_VERSION}" >&2
+    printf "2. 安装游戏核心（开发版）：\n" >&2
+    printf "   %s\n" "${MANUAL_INSTALL_DEV_VERSION}" >&2
+    printf "3. 安装彩色输出支持（推荐）：\n" >&2
+    printf "   %s\n" "${MANUAL_INSTALL_COLORAMA}" >&2
+    echo >&2
+    printf "${GREEN}%s${NC}\n" "${MANUAL_INSTALL_RUN_GAME}" >&2
+    echo >&2
+    printf "${CYAN}==================================================================${NC}\n" >&2
+    echo >&2
     get_user_input "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" "text" > /dev/null
 }
 
@@ -839,60 +899,59 @@ show_main_menu_and_get_choice() {
         fi
 
         # Print menu header
-        echo -e "${CYAN}╔══════════════════════════════════════╗${NC}" >&2
-        echo -e "${CYAN}║    ${INSTALLATION_MENU}           ${NC}" >&2
-        echo -e "${CYAN}╚══════════════════════════════════════╝${NC}" >&2
-        echo "" >&2
+        printf "${CYAN}╔══════════════════════════════════════╗${NC}\n" >&2
+        printf "${CYAN}║    %s           ${NC}\n" "${INSTALLATION_MENU}" >&2
+        printf "${CYAN}╚══════════════════════════════════════╝${NC}\n" >&2
+        echo >&2
         log_message "Displaying main menu"
 
         # Print menu options based on installation status
         if is_installed; then
-            echo -e "${GREEN}${ALREADY_INSTALLED}${NC}" >&2
-            echo "1) ${UPDATE_GAME}" >&2
-            echo "2) ${REPAIR_GAME}" >&2
-            echo "3) ${CLEAN_SAVES}" >&2
-            echo "4) ${UNINSTALL_GAME}" >&2
-            echo "5) ${START_GAME}" >&2
-            echo "6) ${SHOW_MANUAL}" >&2
-            echo "0) ${EXIT_OPTION}" >&2
+            printf "${GREEN}%s${NC}\n" "${ALREADY_INSTALLED}" >&2
+            printf "1) %s\n" "${UPDATE_GAME}" >&2
+            printf "2) %s\n" "${REPAIR_GAME}" >&2
+            printf "3) %s\n" "${CLEAN_SAVES}" >&2
+            printf "4) %s\n" "${UNINSTALL_GAME}" >&2
+            printf "5) %s\n" "${START_GAME}" >&2
+            printf "6) %s\n" "${SHOW_MANUAL}" >&2
+            printf "0) %s\n" "${EXIT_OPTION}" >&2
         else
-            echo -e "${YELLOW}${NOT_INSTALLED}${NC}" >&2
-            echo "1) ${INSTALL_MAIN}" >&2
-            echo "2) ${INSTALL_DEV}" >&2
-            echo "3) ${SHOW_MANUAL}" >&2
-            echo "0) ${EXIT_OPTION}" >&2
+            printf "${YELLOW}%s${NC}\n" "${NOT_INSTALLED}" >&2
+            printf "1) %s\n" "${INSTALL_MAIN}" >&2
+            printf "2) %s\n" "${INSTALL_DEV}" >&2
+            printf "3) %s\n" "${SHOW_MANUAL}" >&2
+            printf "0) %s\n" "${EXIT_OPTION}" >&2
         fi
 
-        # Add spacing and prompt
-        echo "" >&2
-        echo -e "${BLUE}${ENTER_CHOICE}${NC}" >&2
-        sync # Ensure menu is fully displayed
-        sleep 0.1 # Brief delay to ensure terminal rendering
-
-        # Get user input
+        # Add spacing
+        echo >&2
+        
+        # Get user input with prompt
         if is_installed; then
-            choice=$(get_user_input "" "menu_choice_installed")
+            choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_installed")
         else
-            choice=$(get_user_input "" "menu_choice_not_installed")
+            choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_not_installed")
         fi
         log_message "Menu choice received: $choice"
 
         # Validate choice
         if is_installed; then
-            case "$choice" in
-                0|1|2|3|4|5|6) valid_choice=true ;;
-                *) print_error "${INVALID_CHOICE}" ;;
-            esac
+            if [[ "$choice" =~ ^[0-6]$ ]]; then
+                valid_choice=true
+            else
+                print_error "${INVALID_CHOICE}"
+            fi
         else
-            case "$choice" in
-                0|1|2|3) valid_choice=true ;;
-                *) print_error "${INVALID_CHOICE}" ;;
-            esac
+            if [[ "$choice" =~ ^[0-3]$ ]]; then
+                valid_choice=true
+            else
+                print_error "${INVALID_CHOICE}"
+            fi
         fi
 
         if ! "$valid_choice"; then
             log_message "Invalid choice, retrying menu display"
-            echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" >&2
+            printf "${CYAN}%s${NC}\n" "${PRESS_ENTER_TO_CONTINUE}" >&2
             read -r -s -t 30 2>/dev/null || true
         fi
     done
@@ -902,6 +961,12 @@ show_main_menu_and_get_choice() {
 
 # --- 脚本入口点 ---
 main() {
+    # 检查日志文件写入权限
+    touch "$LOG_FILE" 2>/dev/null || {
+        echo "Error: Cannot write to log file $LOG_FILE. Check permissions." >&2
+        exit 1
+    }
+
     # 清空并开始记录新的日志会话
     > "$LOG_FILE"
     log_message "----------------------------------------------------"
@@ -912,7 +977,14 @@ main() {
     log_message "终端类型: $TERM"
     log_message "----------------------------------------------------"
 
+    # 检查终端编码
     check_terminal_encoding
+
+    # 模拟版本检查（假设最新版本为 3.5.0）
+    local repo_version="3.5.0"
+    if [ "$SCRIPT_VERSION" != "$repo_version" ]; then
+        print_warning "$(printf "${VERSION_WARNING}" "$SCRIPT_VERSION" "${REPO_URL}")"
+    fi
 
     while true; do
         local user_choice=$(show_main_menu_and_get_choice)
@@ -941,10 +1013,10 @@ main() {
             esac
         fi
         
-        echo
-        echo -e "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" >&2
+        echo >&2
+        printf "${CYAN}%s${NC}\n" "${PRESS_ENTER_TO_CONTINUE}" >&2
         read -r -s -t 30 || true
-        echo
+        echo >&2
     done
 }
 
