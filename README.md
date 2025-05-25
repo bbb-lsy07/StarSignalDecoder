@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3](https://img.shields.io/badge/Python-3-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-0.7.1-green.svg)](https://github.com/bbb-lsy07/StarSignalDecoder/releases)
+[![Version](https://img.shields.io/badge/Version-0.2.0-green.svg)](https://github.com/bbb-lsy07/StarSignalDecoder/releases)
 
 **星际迷航：信号解码** 是一款开源终端解谜游戏，让你化身星际信号官，挑战未知星域！通过 3 个关卡，解码信号，击败 Boss，收集核心，最终以 100.0% 能量逃离危机。游戏融合科幻剧情、美观 ASCII 界面、关卡选择、道具解锁、无尽模式和排行榜，带来沉浸式冒险体验！
 
@@ -25,17 +25,11 @@
 - **易上手**：提供练习模式、交互式教程（支持跳过）、玩法预览 GIF。
 - **音效支持**：解码成功/失败、强信号、Boss 出现时有简单的终端提示音。
 
-## 玩法预览
-
-![Gameplay GIF](https://raw.githubusercontent.com/bbb-lsy07/StarSignalDecoder/main/docs/starsignal_preview_v07.gif)
-
-通过解码信号挑战 Boss，解锁无尽模式！观看 GIF，快速了解玩法！
 
 ## 快速开始
 
-使用管理脚本（v1.7.1）一键完成安装、更新、修复或卸载，支持 Linux、macOS 和 Windows.
+使用管理脚本一键完成安装、更新、修复或卸载，支持 Linux、macOS 和 Windows.
 
-> **重要提示**：请**不要**通过 `curl ... | sh` 或 `wget ... | sh` 直接运行脚本，这可能导致输入阻塞（如菜单选项无法响应）。请务必**下载脚本到本地后运行**，以确保交互正常。
 
 ### 所有平台（推荐）
 
