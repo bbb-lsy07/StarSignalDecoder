@@ -2,8 +2,9 @@ from setuptools import setup, find_packages
 
 setup(
     name="starsignal",
-    version="0.7.0",
+    version="0.7.1", # 版本号更新为 0.7.1
     packages=find_packages(),
+    # colorama 保持在 extras_require，但会在 README 中强调安装
     install_requires=[],
     extras_require={
         "color": ["colorama>=0.4.6"]
@@ -27,7 +28,12 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10", # 兼容更高版本
+        "Programming Language :: Python :: 3.11",
         "Operating System :: OS Independent",
+        "Environment :: Console",
+        "Topic :: Games/Entertainment",
+        "Topic :: Text Processing :: General",
     ],
     python_requires=">=3.6",
 )
