@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 星际迷航：信号解码 游戏管理脚本 v1.7.6beta
+# 星际迷航：信号解码 游戏管理脚本 v1.7.5
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 
@@ -505,7 +505,7 @@ fix_save_permissions() {
 
 # 检查游戏是否已安装
 is_installed() {
-    command_exists "$GAME_NAME"
+    command -v "$GAME_NAME"
 }
 
 # --- 核心功能函数 (do_*) ---
@@ -691,7 +691,11 @@ show_main_menu_and_get_choice() {
             echo "0) ${EXIT_OPTION}"
             
             echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-            read -r choice < /dev/tty # Read from TTY
+            # 强制从 /dev/tty 读取，即使 stdin 被重定向
+            # 增加 `-t` 超时选项，如果用户没有输入，则在短时间后认为无效输入，避免脚本完全卡住
+            if ! read -r -t 60 choice < /dev/tty; then # 60秒超时，如果没输入就自动判断为空
+                choice="" # If timeout or read fails, set choice to empty
+            fi
             echo # Add newline after input
             
             case "$choice" in
@@ -706,7 +710,9 @@ show_main_menu_and_get_choice() {
             echo "0) ${EXIT_OPTION}"
             
             echo -en "${BLUE}${ENTER_CHOICE}${NC}"
-            read -r choice < /dev/tty # Read from TTY
+            if ! read -r -t 60 choice < /dev/tty; then # 60秒超时
+                choice=""
+            fi
             echo # Add newline after input
 
             case "$choice" in
@@ -738,7 +744,7 @@ main() {
     # 清空并开始记录新的日志会话
     > "$LOG_FILE"
     log_message "----------------------------------------------------"
-    log_message "星际迷航：信号解码 管理脚本启动 v1.7.6" # 更新到1.7.6
+    log_message "星际迷航：信号解码 管理脚本启动 v1.7.7" # 更新到1.7.7
     log_message "操作系统: $OS"
     log_message "语言设置: $LANG_SET"
     log_message "----------------------------------------------------"
