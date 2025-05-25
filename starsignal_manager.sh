@@ -1,51 +1,54 @@
 #!/bin/bash
 
 # ==============================================================================
-# 星际迷航：信号解码 - 快速部署管理脚本 v4.0.2
+# 星际迷航：信号解码 - 快速部署管理脚本 v4.0.3
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 #
 # 功能：
-#   - 跨平台支持 (Linux/macOS 自动化，Windows 提供手动指南)
+#   - 支持 Linux 自动化安装和管理（Windows 提供手动指南）
 #   - 自动检测和安装依赖 (Python3, pip, Git)
 #   - 一键安装稳定版 (main) 或开发版 (dev) 游戏
 #   - 支持游戏更新、修复、清理存档、卸载
 #   - 启动游戏，支持命令行选项 (难度、教程等)
 #   - 自动修复 PATH 和终端编码
-#   - 所有日志和错误直接输出到终端
+#   - 所有日志和错误直接输出到终端，无额外文件
 #
 # 变更日志：
+#   v4.0.3 (2025-05-25):
+#     - 修复 ANSI 转义码显示问题（如 \033[0;34m），确保终端正确渲染颜色
+#     - 替换 select 命令为 read 循环，修复输入（如 4）无效导致循环问题
+#     - 增强输入验证和缓冲区清理，防止 root 执行时输入残留
+#     - 简化终端设置，强制 UTF-8 和 xterm-256color
+#     - 增强终端日志，记录所有输入事件和菜单状态
 #   v4.0.2 (2025-05-25):
-#     - 移除配置文件依赖，硬编码语言(zh)、分支(main)、主题(default)
-#     - 将日志输出整合到终端，移除单独日志文件
-#     - 修复菜单选择逻辑，确保数字输入(如1)正确处理
-#     - 修正函数定义顺序，防止“未找到命令”错误
-#     - 移除存档备份和超时退出，简化快速部署
-#     - 增强错误报告，安装/更新失败时显示详细输出
+#     - 移除配置文件依赖，日志整合到终端
+#     - 修复菜单选择逻辑和函数定义顺序
 #   v4.0.0 (2025-05-25):
-#     - 全新菜单系统，使用 bash select 命令
-#     - 添加配置文件、进度条、帮助系统、存档备份
+#     - 全新菜单系统，添加进度条、帮助系统
 # ==============================================================================
 
 # --- 定义颜色 ---
-DEFAULT_RED='\033[0;31m'
-DEFAULT_GREEN='\033[0;32m'
-DEFAULT_YELLOW='\033[0;33m'
-DEFAULT_BLUE='\033[0;34m'
-DEFAULT_NC='\033[0m' # No Color
-
-RED="$DEFAULT_RED"
-GREEN="$DEFAULT_GREEN"
-YELLOW="$DEFAULT_YELLOW"
-BLUE="$DEFAULT_BLUE"
-NC="$DEFAULT_NC"
+if [ "$(tput colors 2>/dev/null)" -ge 8 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 # --- 全局变量 ---
 REPO_URL="https://github.com/bbb-lsy07/StarSignalDecoder.git"
 GAME_NAME="starsignal"
 DATA_FILE="$HOME/.starsignal_data.json"
 SAVE_FILE_PREFIX="$HOME/.starsignal_save_"
-SCRIPT_VERSION="4.0.2"
+SCRIPT_VERSION="4.0.3"
 PYTHON_CMD=""
 PIP_CMD=""
 DEBUG_MODE=false
@@ -99,7 +102,7 @@ set_texts() {
     SHOW_HELP="显示帮助"
     EXIT_OPTION="退出"
     ENTER_CHOICE="请选择一个选项： "
-    INVALID_CHOICE="无效的选择，请从列表中选择一个数字。"
+    INVALID_CHOICE="无效的选择，请输入列表中的数字。"
     INSTALLING_DEPENDENCIES="正在安装必要的依赖..."
     CHECKING_ENV="正在检查环境..."
     PYTHON_FOUND="检测到 Python 3。"
@@ -125,13 +128,13 @@ set_texts() {
     PATH_FIX_PROMPT="Python 脚本目录不在 PATH 中。是否修复？(y/n)："
     PATH_FIX_LINUX="已修复 Linux 的 PATH。请运行 'source ~/.bashrc' 或重启终端。"
     PATH_FIX_FAILED="无法修复 PATH。请手动添加 Python Scripts 到 PATH。"
-    WARNING_PIPE="警告：本脚本设计为交互式使用。通过管道运行（例如 curl ... | sh）可能导致问题。请下载后本地运行：${YELLOW}curl -s ${REPO_URL}/main/starsignal_manager.sh -o starsignal_manager.sh && chmod +x starsignal_manager.sh && ./starsignal_manager.sh${NC}"
+    WARNING_PIPE="警告：本脚本设计为交互式使用。通过管道运行可能导致问题。请下载后本地运行：${YELLOW}curl -s ${REPO_URL}/main/starsignal_manager.sh -o starsignal_manager.sh && chmod +x starsignal_manager.sh && ./starsignal_manager.sh${NC}"
     CONFIRM_UNINSTALL="您确定要卸载 星际迷航：信号解码吗？(y/n)："
     CONFIRM_CLEAN="您确定要删除所有存档和成就数据吗？(y/n)："
     CANCELLED="操作已取消。"
     CHOOSE_BRANCH="选择分支 (main/dev) [${DEFAULT_BRANCH}]： "
     CHECKING_TERMINAL_ENCODING="正在检查终端编码..."
-    ENCODING_WARNING="终端编码不是 UTF-8，可能导致问题。正在设置为 UTF-8..."
+    ENCODING_WARNING="终端编码不是 UTF-8，可能导致问题。已设置为 UTF-8。"
     TERMINAL_WARNING="终端类型不是 xterm-256color，已强制设置为 xterm-256color。"
     PRESS_ENTER_TO_CONTINUE="按回车键继续..."
     INVALID_INPUT_EMPTY="输入不能为空。"
@@ -206,10 +209,6 @@ command_exists() {
 detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         echo "Linux"
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macOS"
-    elif [[ "$OSTYPE" == "cygwin" || "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-        echo "Windows"
     else
         echo "Unknown"
     fi
@@ -283,7 +282,7 @@ get_user_input() {
             print_error "达到最大输入尝试次数，中止。"
             exit 1
         fi
-        printf "${CYAN}%s${NC}\n" "${PRESS_ENTER_TO_CONTINUE}" >&2
+        printf "${BLUE}%s${NC}\n" "${PRESS_ENTER_TO_CONTINUE}" >&2
         read -r -s -t 60 2>/dev/null || true
     done
     return 1
@@ -293,7 +292,7 @@ get_user_input() {
 run_sudo_cmd() {
     local cmd="$1"
     print_log "Executing sudo command: $cmd"
-    printf "${CYAN}Running: %s ${NC}\n" "$cmd" >&2
+    printf "${BLUE}Running: %s ${NC}\n" "$cmd" >&2
     if ! eval "$cmd"; then
         print_error "命令失败: $cmd"
         return 1
@@ -308,13 +307,6 @@ check_python() {
         PYTHON_CMD="python3"
         print_status "${PYTHON_FOUND}"
         return 0
-    elif command_exists python; then
-        local version=$(python -c 'import sys; print(sys.version_info.major)' 2>/dev/null)
-        if [ "$version" == "3" ]; then
-            PYTHON_CMD="python"
-            print_status "${PYTHON_FOUND}"
-            return 0
-        fi
     fi
     print_warning "${PYTHON_NOT_FOUND}"
     return 1
@@ -323,10 +315,6 @@ check_python() {
 check_pip() {
     if command_exists pip3; then
         PIP_CMD="pip3"
-        print_status "${PIP_FOUND}"
-        return 0
-    elif command_exists pip; then
-        PIP_CMD="pip"
         print_status "${PIP_FOUND}"
         return 0
     fi
@@ -432,11 +420,9 @@ fix_path() {
 }
 
 check_terminal_encoding() {
-    local encoding_ok=true
     if [ "$OS" == "Linux" ]; then
         local current_lang=$(locale | grep -E 'LC_CTYPE|LANG' | head -n 1 | cut -d'=' -f2 | tr -d '"' | cut -d'.' -f2 | tr '[:lower:]' '[:upper:]')
         if [[ "$current_lang" != "UTF-8" && "$current_lang" != "UTF8" ]]; then
-            encoding_ok=false
             print_warning "${ENCODING_WARNING}"
             export LANG=zh_CN.UTF-8
             export LC_ALL=zh_CN.UTF-8
@@ -454,11 +440,11 @@ fix_save_permissions() {
     print_log "${PERMISSION_FIX}"
     if [ "$OS" == "Linux" ]; then
         if [ -f "${DATA_FILE}" ]; then
-            chmod 666 "${DATA_FILE}" || print_error "${PERMISSION_FAILED}"
+            chmod 666 "${DATA_FILE}" 2>/dev/null || print_error "${PERMISSION_FAILED}"
         fi
         for i in {1..3}; do
             if [ -f "${SAVE_FILE_PREFIX}${i}.json" ]; then
-                chmod 666 "${SAVE_FILE_PREFIX}${i}.json" || print_error "${PERMISSION_FAILED}"
+                chmod 666 "${SAVE_FILE_PREFIX}${i}.json" 2>/dev/null || print_error "${PERMISSION_FAILED}"
             fi
         done
         print_status "${PERMISSION_SUCCESS}"
@@ -670,7 +656,7 @@ do_start_game() {
 
 do_show_manual_guide() {
     clear
-    printf "${CYAN}==================================================================\n" >&2
+    printf "${BLUE}==================================================================\n" >&2
     printf "%s\n" "${MANUAL_INSTALL_HEADER}" >&2
     printf "==================================================================${NC}\n" >&2
     echo >&2
@@ -696,14 +682,14 @@ do_show_manual_guide() {
     echo >&2
     printf "${GREEN}%s${NC}\n" "${MANUAL_INSTALL_RUN_GAME}" >&2
     echo >&2
-    printf "${CYAN}==================================================================${NC}\n" >&2
+    printf "${BLUE}==================================================================${NC}\n" >&2
     echo >&2
-    get_user_input "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" "text" > /dev/null
+    get_user_input "${BLUE}${PRESS_ENTER_TO_CONTINUE}${NC}" "text" > /dev/null
 }
 
 do_show_help() {
     clear
-    printf "${CYAN}==================================================================\n" >&2
+    printf "${BLUE}==================================================================\n" >&2
     printf "%s\n" "${HELP_HEADER}" >&2
     printf "==================================================================${NC}\n" >&2
     echo >&2
@@ -737,9 +723,9 @@ do_show_help() {
         printf "   %s\n" "${HELP_EXIT}" >&2
     fi
     echo >&2
-    printf "${CYAN}==================================================================${NC}\n" >&2
+    printf "${BLUE}==================================================================${NC}\n" >&2
     echo >&2
-    get_user_input "${CYAN}${PRESS_ENTER_TO_CONTINUE}${NC}" "text" > /dev/null
+    get_user_input "${BLUE}${PRESS_ENTER_TO_CONTINUE}${NC}" "text" > /dev/null
 }
 
 # --- 主菜单 ---
@@ -749,11 +735,11 @@ show_main_menu() {
         print_warning "${WARNING_PIPE}"
         print_log "Non-terminal detected."
     fi
-    printf "${CYAN}╔══════════════════════════════════════╗${NC}\n" >&2
-    printf "${CYAN}║    %s           ${NC}\n" "${INSTALLATION_MENU}" >&2
-    printf "${CYAN}╚══════════════════════════════════════╝${NC}\n" >&2
+    printf "${BLUE}╔══════════════════════════════════════╗${NC}\n" >&2
+    printf "${BLUE}║    %s           ${NC}\n" "${INSTALLATION_MENU}" >&2
+    printf "${BLUE}╚══════════════════════════════════════╝${NC}\n" >&2
     echo >&2
-    print_log "Displaying main menu"
+    print_log "Entering main menu"
     if is_installed; then
         printf "${GREEN}%s${NC}\n" "${ALREADY_INSTALLED}" >&2
     else
@@ -783,42 +769,63 @@ show_main_menu() {
         )
     fi
 
-    stty sane 2>/dev/null
-    if [ -t 0 ]; then
-        dd if=/dev/stdin of=/dev/null bs=1 count=1000 iflag=nonblock 2>/dev/null
-    fi
+    # 显示菜单选项
+    local i
+    for i in "${!options[@]}"; do
+        printf "${GREEN}%d) %s${NC}\n" "$i" "${options[$i]}" >&2
+    done
+    echo >&2
 
-    PS3="${BLUE}${ENTER_CHOICE}${NC}"
-    select opt in "${options[@]}"; do
-        local choice="$REPLY"
-        print_log "Raw select input: '$choice'"
+    # 获取用户输入
+    local choice=""
+    local max_attempts=5
+    local attempt=0
 
-        # 验证输入是否为数字
+    while [ "$attempt" -lt "$max_attempts" ]; do
+        stty sane 2>/dev/null
+        if [ -t 0 ]; then
+            dd if=/dev/stdin of=/dev/null bs=1 count=1000 iflag=nonblock 2>/dev/null
+        fi
+        printf "${BLUE}%s${NC}" "${ENTER_CHOICE}" >&2
+        read -r -t 60 choice 2>/dev/null
+        print_log "Raw menu input: '$choice'"
+        choice=$(echo "$choice" | tr -d '[:space:]')
+        print_log "Sanitized menu input: '$choice'"
+
+        # 验证输入
         if [[ ! "$choice" =~ ^[0-9]+$ ]]; then
             print_error "${INVALID_CHOICE}"
             print_log "Invalid choice: non-numeric input '$choice'"
+            ((attempt++))
             continue
         fi
 
-        # 验证输入范围
+        # 检查范围
         if is_installed; then
             if [ "$choice" -lt 0 ] || [ "$choice" -gt 7 ]; then
                 print_error "${INVALID_CHOICE}"
                 print_log "Invalid choice: out of range '$choice' (expected 0-7)"
+                ((attempt++))
                 continue
             fi
         else
             if [ "$choice" -lt 0 ] || [ "$choice" -gt 4 ]; then
                 print_error "${INVALID_CHOICE}"
                 print_log "Invalid choice: out of range '$choice' (expected 0-4)"
+                ((attempt++))
                 continue
             fi
         fi
 
-        print_log "User selected: $choice ($opt)"
+        print_log "User selected: $choice (${options[$choice]})"
         echo "$choice"
-        break
+        print_log "Exiting main menu with choice: $choice"
+        return 0
     done
+
+    print_error "达到最大输入尝试次数，中止。"
+    print_log "Maximum menu input attempts reached."
+    exit 1
 }
 
 # --- 脚本入口点 ---
@@ -831,7 +838,7 @@ main() {
     print_log "调试模式: $DEBUG_MODE"
 
     check_terminal_encoding
-    local repo_version="4.0.2"
+    local repo_version="4.0.3"
     if [ "$SCRIPT_VERSION" != "$repo_version" ]; then
         print_warning "$(printf "${VERSION_WARNING}" "$SCRIPT_VERSION" "${REPO_URL}")"
     fi
@@ -840,22 +847,8 @@ main() {
         local user_choice=$(show_main_menu)
         if [ -z "$user_choice" ] || [[ ! "$user_choice" =~ ^[0-9]+$ ]]; then
             print_error "${INVALID_CHOICE}"
-            print_log "Invalid choice: empty or non-numeric '$user_choice'"
+            print_log "Invalid choice in main: empty or non-numeric '$user_choice'"
             continue
-        fi
-
-        if is_installed; then
-            if [ "$user_choice" -lt 0 ] || [ "$user_choice" -gt 7 ]; then
-                print_error "${INVALID_CHOICE}"
-                print_log "Invalid choice: out of range '$user_choice' (expected 0-7)"
-                continue
-            fi
-        else
-            if [ "$user_choice" -lt 0 ] || [ "$user_choice" -gt 4 ]; then
-                print_error "${INVALID_CHOICE}"
-                print_log "Invalid choice: out of range '$user_choice' (expected 0-4)"
-                continue
-            fi
         fi
 
         clear
@@ -880,8 +873,8 @@ main() {
             esac
         fi
         echo >&2
-        printf "${CYAN}%s${NC}\n" "${PRESS_ENTER_TO_CONTINUE}" >&2
-        read -r -s -t 60 || true
+        printf "${BLUE}%s${NC}\n" "${PRESS_ENTER_TO_CONTINUE}" >&2
+        read -r -s -t 60 2>/dev/null || true
         echo >&2
     done
 }
