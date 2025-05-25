@@ -1,12 +1,11 @@
 #!/bin/bash
 
 # ==============================================================================
-# 星际迷航：信号解码 - 全功能管理脚本 v2.5.1
+# 星际迷航：信号解码 - 全功能管理脚本 v2.6.0
 # 作者：bbb-lsy07
 # 邮箱：lisongyue0125@163.com
 #
-# **核心重构版，旨在彻底解决交互式输入问题与鲁棒性**
-# **修复 v2.5.0 中的语法错误**
+# **交互逻辑重构版：最精简的交互，无效输入后立即重绘菜单**
 #
 # 功能：
 #   - 跨平台支持 (Linux/macOS 自动化，Windows 提供详细手动指南)
@@ -35,7 +34,7 @@ GAME_NAME="starsignal"
 DATA_FILE="$HOME/.starsignal_data.json"
 LOG_FILE="$HOME/.starsignal_manager.log" # 仅记录脚本自身核心运行信息
 SAVE_FILE_PREFIX="$HOME/.starsignal_save_"
-SCRIPT_VERSION="2.5.1" # 脚本自身版本
+SCRIPT_VERSION="2.6.0" # 脚本自身版本
 
 # 获取当前脚本的语言设置，默认中文
 LANG_SET="zh"
@@ -47,7 +46,6 @@ fi
 # 文本定义 (根据语言设置)
 set_texts() {
     if [ "$1" == "en" ]; then
-        # English Text
         INSTALLATION_MENU="Star Signal Decoder - Management Menu"
         ALREADY_INSTALLED="StarSignalDecoder is already installed."
         NOT_INSTALLED="StarSignalDecoder is not installed."
@@ -834,15 +832,15 @@ display_menu_and_get_choice() {
             echo "0) ${EXIT_OPTION}"
             
             # 获取用户输入
-            choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_installed")
-            
+            echo -en "${BLUE}${ENTER_CHOICE}${NC}" # Prompt
+            read -r choice < /dev/tty # Read directly from TTY
+            echo # Newline after input
+
             # 验证输入
             case "$choice" in
                 0|1|2|3|4|5|6) valid_choice=true ;;
-                *) # get_user_input 已经处理了空和非数字，这里只需通用错误提示
-                    # 错误提示已由get_user_input处理，这里无需重复打印
-                    : # Do nothing, loop will continue
-                    ;;
+                "") print_error "${INVALID_INPUT_EMPTY}" ;;
+                *) print_error "${INVALID_INPUT_NOT_NUMBER}" ;;
             esac
         else # 游戏未安装
             echo -e "${YELLOW}${NOT_INSTALLED}${NC}"
@@ -852,19 +850,19 @@ display_menu_and_get_choice() {
             echo "0) ${EXIT_OPTION}"
             
             # 获取用户输入
-            choice=$(get_user_input "${BLUE}${ENTER_CHOICE}${NC}" "menu_choice_not_installed")
+            echo -en "${BLUE}${ENTER_CHOICE}${NC}" # Prompt
+            read -r choice < /dev/tty # Read directly from TTY
+            echo # Newline after input
 
             # 验证输入
             case "$choice" in
                 0|1|2|3) valid_choice=true ;;
-                *) # get_user_input 已经处理了空和非数字，这里只需通用错误提示
-                    # 错误提示已由get_user_input处理，这里无需重复打印
-                    : # Do nothing, loop will continue
-                    ;;
+                "") print_error "${INVALID_INPUT_EMPTY}" ;;
+                *) print_error "${INVALID_INPUT_NOT_NUMBER}" ;;
             esac
         fi
 
-        # 如果输入无效，get_user_input 会自动提示并清屏重绘，所以这里无需额外逻辑
+        # 如果输入无效，打印错误后循环将自动清屏重绘
     done
     
     echo "$choice" # 返回有效的用户选择
@@ -875,8 +873,6 @@ main() {
     # 检查是否在交互式终端运行的警告（非强制退出）
     if ! [ -t 0 ] || ! [ -t 1 ]; then
         print_warning "${WARNING_PIPE}"
-        # 如果脚本在非交互式环境中运行，这里仍然假设它需要交互，
-        # 如果 /dev/tty 不可用，交互会卡住，因此警告很重要。
     fi
 
     # 清空并开始记录新的日志会话
